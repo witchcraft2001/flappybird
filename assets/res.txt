@@ -1,0 +1,5 @@
+..\cutted\sky_color.png
+..\cutted\grass_color.png
+..\cutted\wall_color.png
+..\cutted\city.png
+..\cutted\way.png

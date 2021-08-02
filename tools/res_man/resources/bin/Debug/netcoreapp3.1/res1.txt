@@ -1,0 +1,5 @@
+wolf_bg.png
+wolf_up_right.png
+wolf_dn_right.png
+wolf_up_left.png
+wolf_dn_left.png

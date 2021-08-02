@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "resources": {
+      "commandName": "Project",
+      "commandLineArgs": "res.txt"
+    }
+  }
+}
