@@ -220,20 +220,20 @@
 0008   8103             
 0009   8103 F3          main: 	        di
 0010   8104             ;                ld (DOSLine+1),ix
-0011   8104 CD 49 82                    call SavePages
-0012   8107 21 80 88                    ld hl,AppDir
+0011   8104 CD BF 82                    call SavePages
+0012   8107 21 00 89                    ld hl,AppDir
 0013   810A 01 47 01                    ld bc,256 + Dss.AppInfo
 0014   810D D7                          rst #10
-0015   810E 21 80 88                    ld hl,AppDir
-0016   8111 11 00 89                    ld de,AssetsDir
+0015   810E 21 00 89                    ld hl,AppDir
+0016   8111 11 80 89                    ld de,AssetsDir
 0017   8114 01 80 00                    ld bc,128
 0018   8117 ED B0                       ldir
-0019   8119 21 00 89                    ld hl,AssetsDir
+0019   8119 21 80 89                    ld hl,AssetsDir
 0020   811C E5                          push hl
-0021   811D CD 43 82                    call FindNextName
+0021   811D CD B9 82                    call FindNextName
 0022   8120 2B                          dec hl
 0023   8121 EB                          ex de,hl
-0024   8122 21 A4 83                    ld hl,AssetsDirName
+0024   8122 21 1A 84                    ld hl,AssetsDirName
 0025   8125 01 07 00                    ld bc,city-AssetsDirName
 0026   8128 ED B0                       ldir
 0027   812A E1                          pop hl
@@ -241,1062 +241,1150 @@
 0029   812C 0E 1D                       ld c,Dss.ChDir
 0030   812E D7                          rst #10
 0031   812F 30 0A                       jr nc,.next
-0032   8131 21 52 83                    ld hl,OpenDirErrorMessage
+0032   8131 21 C8 83                    ld hl,OpenDirErrorMessage
 0033   8134 0E 5C                       ld c,Dss.PChars
 0034   8136 D7                          rst #10
 0035   8137 E1                          pop hl
-0036   8138 C3 87 82                    jp PrintError
+0036   8138 C3 FD 82                    jp PrintError
 0037   813B             
 0038   813B E1          .next:           pop hl
-0039   813C 21 74 83                    ld hl,ResourcesLoadingMessage
+0039   813C 21 EA 83                    ld hl,ResourcesLoadingMessage
 0040   813F 0E 5C                       ld c,Dss.PChars
 0041   8141 D7                          rst #10
-0042   8142 3A A3 83                    ld a,(assetsBlocks)
+0042   8142 3A 19 84                    ld a,(assetsBlocks)
 0043   8145 F5                          push af
 0044   8146 47                          ld b,a
 0045   8147 0E 3D                       ld c,Dss.GetMem
 0046   8149 D7                          rst #10
-0047   814A DA 78 82                    jp c,NotEnoughtMemory
-0048   814D 32 C6 83                    ld (MemoryDescriptor),a
-0049   8150 21 9F 83                    ld hl,MemoryBuffer
+0047   814A DA EE 82                    jp c,NotEnoughtMemory
+0048   814D 32 3C 84                    ld (MemoryDescriptor),a
+0049   8150 21 15 84                    ld hl,MemoryBuffer
 0050   8153 0E C5                       ld c,Bios.Emm_Fn5
 0051   8155 CF                          rst #08
 0052   8156 C1                          pop bc
-0053   8157 11 9F 83                    ld de,MemoryBuffer
-0054   815A 21 AB 83                    ld hl,city
+0053   8157 11 15 84                    ld de,MemoryBuffer
+0054   815A 21 21 84                    ld hl,city
 0055   815D D5          .loadLoop:       push de
 0056   815E C5                          push bc
 0057   815F E5                          push hl
-0058   8160 CD CC 81                    call LoadResource
-0059   8163 DA C0 81                    jp c,.error                
+0058   8160 CD D2 81                    call LoadResource
+0059   8163 DA C6 81                    jp c,.error                
 0060   8166 E1                          pop hl
-0061   8167 CD 43 82                    call FindNextName
+0061   8167 CD B9 82                    call FindNextName
 0062   816A C1                          pop bc
 0063   816B D1                          pop de
 0064   816C 13                          inc de
 0065   816D 10 EE                       djnz .loadLoop                
-0066   816F CD D1 83                    call ChangeVideoMode
-0067   8172 21 01 86                    ld hl,Palette+1
-0068   8175 3A 00 86                    ld a,(Palette)
+0066   816F CD 47 84                    call ChangeVideoMode
+0067   8172 21 77 86                    ld hl,Palette+1
+0068   8175 3A 76 86                    ld a,(Palette)
 0069   8178 57                          ld d,a
 0070   8179 1E 00                       ld e,0
 0071   817B 3E 01                       ld a,1
-0072   817D CD C0 84                    call SetPalette
+0072   817D CD 36 85                    call SetPalette
 0073   8180             
 0074   8180                             ; ld hl,TempPal
 0075   8180                             ; call ResetPallete
 0076   8180                             ; call ShowBackground
 0077   8180                             ; call CopyBackground
-0078   8180 11 CE 82                    ld de,Im2Handler
-0079   8183 CD E3 85                    call set_im2
-0080   8186 CD 9D 82                    call PlayerInit
+0078   8180 11 44 83                    ld de,Im2Handler
+0079   8183 CD 59 86                    call set_im2
+0080   8186 CD 13 83                    call PlayerInit
 0081   8189                             ; ld hl,Palette+1
 0082   8189                             ; ld de,TempPal
 0083   8189                             ; ld a,(Palette)
 0084   8189                             ; ld b,a
 0085   8189                             ; ld c,0
 0086   8189                             ; call UnfadePallete
-0087   8189 CD F7 81                    call FillScreen
-0088   818C 3E 01                       ld a,1
-0089   818E 32 E2 82                    ld (Im2Handler.needChangePage),a        ;Переключаем основной экран на 1
-0090   8191 FB                          ei
-0091   8192 76                          halt
-0092   8193 CD F7 81                    call FillScreen
-0093   8196 DB C9                       in a,(RGMOD)
-0094   8198 A7                          and a
-0095   8199 3E 01                       ld a,1
-0096   819B 20 03                       jr nz,.loop
-0097   819D 32 E2 82                    ld (Im2Handler.needChangePage),a        ;Переключаем основной экран на 1
-0098   81A0 FB          .loop:           ei
-0099   81A1 76                          halt
-0100   81A2                             ; call Update0Screen
-0101   81A2                             ; call UpdateScreenFlag
-0102   81A2 CD D2 85                    call CheckKeys
-0103   81A5 D2 A0 81                    jp nc,.loop
-0104   81A8             
-0105   81A8             .exit: 
-0106   81A8 DB C9                       in a,(RGMOD)
-0107   81AA E6 01                       and 1                
-0108   81AC C4 F3 83                    call nz,ChangeVideoPage
-0109   81AF                             ; ld hl,Palette+1
-0110   81AF                             ; ld de,TempPal
-0111   81AF                             ; push de
-0112   81AF                             ; ld bc,256*4
-0113   81AF                             ; ldir
-0114   81AF                             ; pop hl
-0115   81AF                             ; ld a,(Palette)
-0116   81AF                             ; ld d,a
-0117   81AF                             ; ld e,0                
-0118   81AF                             ; call FadePallete
-0119   81AF CD B9 82                    call PlayerMute
-0120   81B2 CD F7 85                    call set_im1
-0121   81B5 CD EA 83                    call RestoreVideoMode
-0122   81B8 CD 63 82                    call RestorePages
-0123   81BB 01 41 00                    ld bc,Dss.Exit
-0124   81BE D7          	        rst #10
-0125   81BF C9          	        ret
-0126   81C0             
-0127   81C0 E1          .error:          pop hl
-0128   81C1 D1                          pop de
-0129   81C2 C1                          pop bc
-0130   81C3 C3 7E 82                    jp  FileReadError
-0131   81C6             
-0132   81C6             ;Обновляем флаг необходимости смены основного экрана
-0133   81C6             UpdateScreenFlag: 
-0134   81C6 3E 01                       ld a,1
-0135   81C8 32 E2 82                    ld (Im2Handler.needChangePage),a
-0136   81CB C9                          ret
-0137   81CC             
-0138   81CC 1A          LoadResource:    ld  a,(de)
-0139   81CD D3 E2                       out (EmmWin.P3),a
-0140   81CF E5                          push hl
-0141   81D0 0E 5C                       ld c,Dss.PChars
-0142   81D2 D7                          rst #10
-0143   81D3 21 9A 83                    ld hl,CrLf
-0144   81D6 0E 5C                       ld c,Dss.PChars
-0145   81D8 D7                          rst #10
-0146   81D9 E1                          pop hl
-0147   81DA AF                          xor a
-0148   81DB 0E 11       	        ld c,Dss.Open
-0149   81DD D7          	        rst #10
-0150   81DE D8          	        ret c
-0151   81DF 32 9E 83    	        ld (fHandler),A
-0152   81E2 21 00 C0                    LD	HL,ADDR
-0153   81E5 11 00 40    	        LD	DE,#4000
-0154   81E8 3A 9E 83    	        LD	A,(fHandler)
-0155   81EB 0E 13       	        LD	C,Dss.Read
-0156   81ED D7          	        RST	#10
-0157   81EE F5                          push af
-0158   81EF 3A 9E 83                    LD	A,(fHandler)
-0159   81F2 0E 12                       ld c,Dss.Close
-0160   81F4 D7                          rst #10
-0161   81F5 F1                          pop af
-0162   81F6 C9                          ret
-0163   81F7             
-0164   81F7 DB E2       FillScreen:      in a,(EmmWin.P3)
-0165   81F9 F5                          push af
-0166   81FA 3E 50                       ld a,#50
-0167   81FC D3 E2                       out (EmmWin.P3),a
-0168   81FE 01 40 01                    ld bc,320
-0169   8201 DB C9                       in a,(RGMOD)
-0170   8203 21 00 C0                    ld hl,#c000
-0171   8206 E6 01                       and 1
-0172   8208 28 03                       jr z,.firstScreen
-0173   820A 21 40 C1                    ld hl,#c140
-0174   820D F3          .firstScreen:    di
-0175   820E AF                          xor a
-0176   820F D3 89                       out (Y_PORT),a
-0177   8211 52                          ld d,d
-0178   8212 3E 64                       ld a,100        ;sky height
-0179   8214 5B                          ld e,e
-0180   8215 36 00                       ld (hl),0
-0181   8217 40                          ld b,b
-0182   8218 D3 89                       out (Y_PORT),a
-0183   821A 52                          ld d,d
-0184   821B 3E 64                       ld a,100        ;grass height
-0185   821D 5B                          ld e,e
-0186   821E 36 01                       ld (hl),1
-0187   8220 40                          ld b,b
-0188   8221                             ; ld a,199        ;grass Y pos
-0189   8221                             ; out (Y_PORT),a
-0190   8221                             ; ld d,d
-0191   8221                             ; ld a,56         ;wall height
-0192   8221                             ; ld e,e
-0193   8221                             ; ld (hl),2
-0194   8221                             ; ld b,b
-0195   8221 AF                          xor a
-0196   8222 D3 89                       out (Y_PORT),a
-0197   8224 54                          ld d,h
-0198   8225 5D                          ld e,l
-0199   8226 13                          inc de
-0200   8227 01 3F 01                    ld bc,#140-1
-0201   822A 52                          ld d,d         ;copy vertical lines
-0202   822B 3E 00                       ld a,0
-0203   822D 7F                          ld a,a
-0204   822E ED B0                       ldir
-0205   8230 40                          ld b,b
-0206   8231 F1                          pop af
-0207   8232 D3 E2                       out (EmmWin.P3),a
-0208   8234 C9                          ret
-0209   8235             
-0210   8235 D5          CoordToAddrP3:   push de
-0211   8236 11 00 C0                    ld de,#c000
-0212   8239 19                          add hl,de
-0213   823A D1                          pop de
-0214   823B C9                          ret
-0215   823C             
-0216   823C D5          CoordToAddrP1:   push de
-0217   823D 11 00 40                    ld de,#4000
-0218   8240 19                          add hl,de
-0219   8241 D1                          pop de
-0220   8242 C9                          ret
-0221   8243             
-0222   8243 7E          FindNextName:    ld a,(hl)
-0223   8244 23                          inc hl
-0224   8245 A7                          and a
-0225   8246 C8                          ret z
-0226   8247 18 FA                       jr FindNextName
-0227   8249             
-0228   8249             ;Сохранение номеров страниц при запуске
-0229   8249 21 C7 83    SavePages:       ld hl,Pages
-0230   824C 3E 82                       ld a,EmmWin.P0
-0231   824E CD DB 85                    call SavePage
-0232   8251 23                          inc hl
-0233   8252 3E A2                       ld a,EmmWin.P1
-0234   8254 CD DB 85                    call SavePage
-0235   8257 23                          inc hl
-0236   8258 3E C2                       ld a,EmmWin.P2
-0237   825A CD DB 85                    call SavePage
-0238   825D 23                          inc hl
-0239   825E 3E E2                       ld a,EmmWin.P3
-0240   8260 C3 DB 85                    jp SavePage
-0241   8263             
-0242   8263             ;Восстановление номеров страниц при завершении
-0243   8263             RestorePages: 
-0244   8263 21 C7 83                    ld hl, Pages
-0245   8266 3E 82                       ld a,EmmWin.P0
-0246   8268 CD DF 85                    call RestorePage
-0247   826B 23                          inc hl
-0248   826C 3E A2                       ld a,EmmWin.P1
-0249   826E CD DF 85                    call RestorePage
-0250   8271 23                          inc hl
-0251   8272                         ;ld a,cpu_w2
-0252   8272                         ;call SavePage
-0253   8272 23                          inc hl
-0254   8273 3E E2                       ld a,EmmWin.P3
-0255   8275 C3 DF 85                    jp RestorePage
-0256   8278             
-0257   8278             NotEnoughtMemory: 	
-0258   8278 21 13 83                    ld hl,NotEnoughtMemoryMessage
-0259   827B C3 87 82        	        jp PrintError
-0260   827E             
-0261   827E             FileReadError: 
-0262   827E CD 63 82                    call RestorePages
-0263   8281 21 34 83                    ld hl,FileReadErrorMessage
-0264   8284 C3 87 82                    jp PrintError
-0265   8287             
-0266   8287             PrintError: 	    
-0267   8287 0E 5C                       ld c,Dss.PChars			;печатаем
-0268   8289 D7                          rst #10
-0269   828A CD 63 82                    call RestorePages
-0270   828D 3A C6 83                    ld a,(MemoryDescriptor)
-0271   8290 A7                          and a
-0272   8291 28 03                       jr z,.next
-0273   8293 0E 3E                       ld c,Dss.FreeMem
-0274   8295 D7                          rst #10
-0275   8296 01 41 FF    .next:           ld bc,#FF41
-0276   8299 D7                          rst #10
-0277   829A C3 9A 82                    jp $				; привычка...
-0278   829D             
-0279   829D             PlayerInit: 
-0280   829D DB E2                       in a,(EmmWin.P3)
-0281   829F F5                          push af
-0282   82A0 3E 01                       ld a,1
-0283   82A2 32 F5 82                    ld (Im2Handler.musicEnabled),a
-0284   82A5 3A A1 83                    ld a,(MemoryBuffer.memMusic)
-0285   82A8 D3 E2                       out (EmmWin.P3),a
-0286   82AA CD 00 C0                    call PlayerStart
-0287   82AD F1          .exit:           pop af
-0288   82AE D3 E2                       out (EmmWin.P3),a
-0289   82B0 C9                          ret
-0290   82B1             
-0291   82B1 3A A1 83    Player:          ld a,(MemoryBuffer.memMusic)
-0292   82B4 D3 E2                       out (EmmWin.P3),a
-0293   82B6 C3 05 C0                    jp PlayerStart+5
-0294   82B9             PlayerMute: 
-0295   82B9 DB E2                       in a,(EmmWin.P3)
-0296   82BB F5                          push af
-0297   82BC 3A F5 82                    ld a,(Im2Handler.musicEnabled)
-0298   82BF EE 01                       xor 1
-0299   82C1 32 F5 82                    ld (Im2Handler.musicEnabled),a
-0300   82C4 3A A1 83                    ld a,(MemoryBuffer.memMusic)
-0301   82C7 D3 E2                       out (EmmWin.P3),a
-0302   82C9 CD 08 C0                    call PlayerStart+8
-0303   82CC 18 DF                       jr PlayerInit.exit
-0304   82CE             
-0305   82CE F3          Im2Handler:      di
-0306   82CF F5                          push af
-0307   82D0 E5                          push hl
-0308   82D1 C5                          push bc
-0309   82D2 D5                          push de
-0310   82D3 DD E5                       push ix
-0311   82D5 FD E5                       push iy
-0312   82D7 D9                          exx
-0313   82D8 08                          ex af,af'
-0314   82D9 F5                          push af
-0315   82DA E5                          push hl
-0316   82DB C5                          push bc
-0317   82DC D5                          push de
-0318   82DD DD E5                       push ix
-0319   82DF FD E5                       push iy
-0320   82E1 3E 00       	        ld a,0
-0321   82E3             .needChangePage:  equ $-1
-0322   82E3 A7          	        and a
-0323   82E4 28 07       	        jr z,.skip
-0324   82E6 CD F3 83                    call ChangeVideoPage
-0325   82E9 AF                          xor a
-0326   82EA 32 E2 82                    ld (.needChangePage),a
-0327   82ED DB E2       .skip:           in a,(EmmWin.P3)
-0328   82EF F5                          push af
-0329   82F0 21 9D 83                    ld hl,Counter
-0330   82F3 34                          inc (hl)
-0331   82F4 3E 00                       ld a,0
-0332   82F6             .musicEnabled:   equ $-1
-0333   82F6 A7                          and a
-0334   82F7 C4 B1 82                    call nz,Player
-0335   82FA F1                          pop af
-0336   82FB D3 E2                       out (EmmWin.P3),a
-0337   82FD FD E1                       pop iy
-0338   82FF DD E1                       pop ix
-0339   8301 D1                          pop de
-0340   8302 C1                          pop bc
-0341   8303 E1                          pop hl
-0342   8304 F1                          pop af
-0343   8305 08                          ex af,af'
-0344   8306 D9                          exx
-0345   8307 FD E1                       pop iy
-0346   8309 DD E1                       pop ix
-0347   830B D1                          pop de
-0348   830C C1                          pop bc
-0349   830D E1                          pop hl
-0350   830E F1                          pop af
-0351   830F FB                          ei
-0352   8310 C3 38 00                    jp #38
-0353   8313             
-0354   8313             NotEnoughtMemoryMessage: 
-0355   8313                             db cr,lf,"Error: Not enought memory!",cr,lf
-0355   8313 0D0A4572726F723A204E6F7420656E6F75676874206D656D6F7279210D0A
-0356   8331 0D 0A 00    		db cr,lf,0
-0357   8334             
-0358   8334             FileReadErrorMessage: 
-0359   8334                             db cr,lf,"Error: Can't read file!",cr,lf
-0359   8334 0D0A4572726F723A2043616E277420726561642066696C65210D0A
-0360   834F 0D 0A 00    		db cr,lf,0
-0361   8352             OpenDirErrorMessage: 
-0362   8352                             db cr,lf,"Error: Can't open ASSETS dir!"
-0362   8352 0D0A4572726F723A2043616E2774206F70656E204153534554532064697221
-0363   8371 0D 0A 00    		db cr,lf,0
-0364   8374             
-0365   8374             ResourcesLoadingMessage: 
-0366   8374                             db cr,lf,"Loading resources, please wait ...",cr,lf
-0366   8374 0D0A4C6F6164696E67207265736F75726365732C20706C656173652077616974
-0366   8394 202E2E2E0D0A
-0367   839A 0D 0A 00    CrLf: 		db cr,lf,0
-0368   839D             
-0369   839D 00          Counter:         db 0
-0370   839E 00          fHandler        db 0
-0371   839F             
-0372   839F             MemoryBuffer: 
-0373   839F 00          .memCity      db 0
-0374   83A0 00          .memWay       db 0
-0375   83A1 00          .memMusic       db 0
-0376   83A2 00                          db 0
-0377   83A3 03          assetsBlocks    db 3
-0378   83A4             
-0379   83A4             AssetsDirName   db "ASSETS",0
-0379   83A4 41535345545300
-0380   83AB             city            db "city.bin",0
-0380   83AB 636974792E62696E00
-0381   83B4             way             db "way.bin",0
-0381   83B4 7761792E62696E00
-0382   83BC             music           db "music.bin",0
-0382   83BC 6D757369632E62696E00
-0383   83C6             MemoryDescriptor: 
-0384   83C6 00                          db 0
-0385   83C7             
-0386   83C7             ;Страницы, которые были открыты при запуске программы
-0387   83C7             Pages: 
-0388   83C7 00          Page0:           db 0
-0389   83C8 00          Page1:           db 0
-0390   83C9 00          Page2:           db 0
-0391   83CA 00          Page3:           db 0
-0392   83CB             
-0393   83CB             CardCoord0:       
-0394   83CB 00          .y:              db 0
-0395   83CC 00 00       .x:              dw 0
-0396   83CE             
-0397   83CE             CardCoord1: 
-0398   83CE 00          .y:              db 0
-0399   83CF 00 00       .x:              dw 0
-0400   83D1             
-0401   83D1                             include "grx_utils.asm"
-0001+  83D1             ChangeVideoMode: 
-0002+  83D1 0E 51       	LD	C,Dss.GetVMod
-0003+  83D3 D7          	RST	#10
-0004+  83D4 32 C2 85    	LD	(OldVideoMode),a
-0005+  83D7 78          	ld	a,b
-0006+  83D8 32 C3 85    	ld	(OldVideoPage),a
-0007+  83DB 3E 81       	LD	A,#81
-0008+  83DD 06 01       	LD	B,1
-0009+  83DF CD E6 83    	call	SetVideoMode
-0010+  83E2 3E 81       	LD	A,#81
-0011+  83E4 06 00       	LD	B,0
-0012+  83E6             
-0013+  83E6             SetVideoMode: 
-0014+  83E6 0E 50       	LD	C,Dss.SetVMod
-0015+  83E8 D7          	RST	#10
-0016+  83E9 C9          	RET
-0017+  83EA             RestoreVideoMode: 
-0018+  83EA 3A C3 85    	ld	a,(OldVideoPage)
-0019+  83ED 47          	LD	B,a
-0020+  83EE 3A C2 85    	LD	a,(OldVideoMode)
-0021+  83F1 18 F3       	JR	SetVideoMode
-0022+  83F3             
-0023+  83F3             ChangeVideoPage: 
-0024+  83F3 DB C9       	in	a,(RGMOD)
-0025+  83F5 EE 01       	xor	1
-0026+  83F7 D3 C9       	out	(RGMOD),a
-0027+  83F9 C9          	ret
-0028+  83FA             
-0029+  83FA             ;BC - откуда
-0030+  83FA             ;HL - ширина
-0031+  83FA             ;DE - куда
-0032+  83FA             ;A - Y координата
-0033+  83FA             ;A' - Высота
-0034+  83FA             
-0035+  83FA             ShowBitmap: 
-0036+  83FA 22 1C 84    	LD	(.len), HL
-0037+  83FD 60          	LD	H,B
-0038+  83FE 69          	LD	L,C
-0039+  83FF             ;	LD	HL,ADDR+#76
-0040+  83FF             ;	LD	DE,#4000
-0041+  83FF 08          	EX	AF,AF'
-0042+  8400 47          	LD	B,A
-0043+  8401 DB A2       	IN	A,(EmmWin.P1)
-0044+  8403 F5          	PUSH	AF
-0045+  8404 3E 50       	LD	A,#50
-0046+  8406 D3 A2       	OUT	(EmmWin.P1),A
-0047+  8408 DB C9       	in a,(RGMOD)
-0048+  840A E6 01       	and 1
-0049+  840C 28 08       	jr z,.firstpg
-0050+  840E EB          	ex de,hl
-0051+  840F D5          	push de
-0052+  8410 11 40 01    	ld de,#0140
-0053+  8413 19          	add hl,de
-0054+  8414 D1          	pop de
-0055+  8415 EB          	ex de,hl
-0056+  8416             .firstpg: 
-0057+  8416 08          	EX	AF,AF'
-0058+  8417             ;	LD	A,0
-0059+  8417             ;	LD	B,100
-0060+  8417 C5          .loop	PUSH	BC
-0061+  8418 D5          	PUSH	DE
-0062+  8419 D3 89       	OUT	(#89),A
-0063+  841B 01 00 00    	LD	BC,0
-0064+  841E             .len: 	EQU	$-2
-0065+  841E ED B0       	LDIR
-0066+  8420 D1          	POP	DE
-0067+  8421 C1          	POP	BC
-0068+  8422 3C          	INC	A
-0069+  8423 10 F2       	DJNZ	.loop
-0070+  8425 F1          	POP	AF
-0071+  8426 D3 A2       	OUT	(EmmWin.P1),A
-0072+  8428 C9          	RET
-0073+  8429             
-0074+  8429             ;BC - откуда
-0075+  8429             ;HL - ширина
-0076+  8429             ;DE - куда
-0077+  8429             ;A - Y координата
-0078+  8429             ;A' - Высота
-0079+  8429             
-0080+  8429             ShowBitmapShadow: 
-0081+  8429 22 4B 84    	LD	(.len), HL
-0082+  842C 60          	LD	H,B
-0083+  842D 69          	LD	L,C
-0084+  842E             ;	LD	HL,ADDR+#76
-0085+  842E             ;	LD	DE,#4000
-0086+  842E 08          	EX	AF,AF'
-0087+  842F 47          	LD	B,A
-0088+  8430 DB A2       	IN	A,(EmmWin.P1)
-0089+  8432 F5          	PUSH	AF
-0090+  8433 3E 50       	LD	A,#50
-0091+  8435 D3 A2       	OUT	(EmmWin.P1),A
-0092+  8437 DB C9       	in a,(RGMOD)
-0093+  8439 E6 01       	and 1
-0094+  843B 20 08       	jr nz,.firstpg
-0095+  843D EB          	ex de,hl
-0096+  843E D5          	push de
-0097+  843F 11 40 01    	ld de,#0140
-0098+  8442 19          	add hl,de
-0099+  8443 D1          	pop de
-0100+  8444 EB          	ex de,hl
-0101+  8445             .firstpg: 
-0102+  8445 08          	EX	AF,AF'
-0103+  8446             ;	LD	A,0
-0104+  8446             ;	LD	B,100
-0105+  8446 C5          .loop	PUSH	BC
-0106+  8447 D5          	PUSH	DE
-0107+  8448 D3 89       	OUT	(#89),A
-0108+  844A 01 00 00    	LD	BC,0
-0109+  844D             .len: 	EQU	$-2
-0110+  844D ED B0       	LDIR
-0111+  844F D1          	POP	DE
-0112+  8450 C1          	POP	BC
-0113+  8451 3C          	INC	A
-0114+  8452 10 F2       	DJNZ	.loop
-0115+  8454 F1          	POP	AF
-0116+  8455 D3 A2       	OUT	(EmmWin.P1),A
-0117+  8457 C9          	RET
-0118+  8458             ;BC - высота/ширина
-0119+  8458             ;HL - откуда
-0120+  8458             ;DE - куда
-0121+  8458             ;A - Y координата
-0122+  8458             ShowBitmapAcc: 
-0123+  8458             ;	LD	HL,ADDR+#76
-0124+  8458             ;	LD	DE,#4000
-0125+  8458 08          	ex af,af'
-0126+  8459 79          	ld a,c
-0127+  845A 32 7A 84    	ld (.len),a
-0128+  845D DB A2       	IN A,(EmmWin.P1)
-0129+  845F F5          	push af
-0130+  8460 3E 50       	LD A,#50
-0131+  8462 D3 A2       	OUT (EmmWin.P1),A
-0132+  8464 DB C9       	in a,(RGMOD)
-0133+  8466 E6 01       	and 1
-0134+  8468 20 08       	jr nz,.firstpg
-0135+  846A EB          	ex de,hl
-0136+  846B D5          	push de
-0137+  846C 11 40 01    	ld de,#0140
-0138+  846F 19          	add hl,de
-0139+  8470 D1          	pop de
-0140+  8471 EB          	ex de,hl
-0141+  8472             .firstpg: 
-0142+  8472 08          	ex af,af'
-0143+  8473             ;	LD	A,0
-0144+  8473             ;	LD	B,100
-0145+  8473 C5          .loop: 	PUSH BC
-0146+  8474 F5          	push af
-0147+  8475 D3 89       	OUT (#89),A
-0148+  8477 F3          	di
-0149+  8478 52          	ld d,d		;enable accel, set buffer size
-0150+  8479 3E 00       	ld a,0
-0151+  847B             .len: 	equ $-1
-0152+  847B 6D          	ld l,l
-0153+  847C 7E          	ld a,(hl)
-0154+  847D 12          	ld (de),a
-0155+  847E 40          	ld b,b
-0156+  847F FB          	ei
-0157+  8480 06 00       	ld b,0
-0158+  8482 09          	add hl,bc
-0159+  8483 F1          	pop af
-0160+  8484 C1          	POP BC
-0161+  8485 3C          	INC A
-0162+  8486 10 EB       	DJNZ .loop
-0163+  8488 F1          	pop af
-0164+  8489 D3 A2       	OUT (EmmWin.P1),A
-0165+  848B C9          	RET
-0166+  848C             
-0167+  848C             ;BC - высота/ширина
-0168+  848C             ;HL - откуда
-0169+  848C             ;DE - куда
-0170+  848C             ;A - Y координата
-0171+  848C             ShowMaskBitmapShadowAcc: 
-0172+  848C             ;	LD	HL,ADDR+#76
-0173+  848C             ;	LD	DE,#4000
-0174+  848C 08          	ex af,af'
-0175+  848D 79          	ld a,c
-0176+  848E 32 AE 84    	ld (.len),a
-0177+  8491 DB A2       	IN A,(EmmWin.P1)
-0178+  8493 F5          	push af
-0179+  8494 3E 5C       	LD A,#5C
-0180+  8496 D3 A2       	OUT (EmmWin.P1),A
-0181+  8498 DB C9       	in a,(RGMOD)
-0182+  849A E6 01       	and 1
-0183+  849C 20 08       	jr nz,.firstpg
-0184+  849E EB          	ex de,hl
-0185+  849F D5          	push de
-0186+  84A0 11 40 01    	ld de,#0140
-0187+  84A3 19          	add hl,de
-0188+  84A4 D1          	pop de
-0189+  84A5 EB          	ex de,hl
-0190+  84A6             .firstpg: 
-0191+  84A6 08          	ex af,af'
-0192+  84A7             ;	LD	A,0
-0193+  84A7             ;	LD	B,100
-0194+  84A7 C5          .loop	PUSH BC
-0195+  84A8 F5          	push af
-0196+  84A9 D3 89       	OUT (#89),A
-0197+  84AB F3          	di
-0198+  84AC 52          	ld d,d		;enable accel, set buffer size
-0199+  84AD 3E 00       	ld a,0
-0200+  84AF             .len: 	equ $-1
-0201+  84AF 6D          	ld l,l
-0202+  84B0 7E          	ld a,(hl)
-0203+  84B1 12          	ld (de),a
-0204+  84B2 40          	ld b,b
-0205+  84B3 FB          	ei
-0206+  84B4 06 00       	ld b,0
-0207+  84B6 09          	add hl,bc
-0208+  84B7 F1          	pop af
-0209+  84B8 C1          	POP BC
-0210+  84B9 3C          	INC A
-0211+  84BA 10 EB       	DJNZ .loop
-0212+  84BC F1          	pop af
-0213+  84BD D3 A2       	OUT (EmmWin.P1),A
-0214+  84BF C9          	RET
-0215+  84C0             
-0216+  84C0             ;HL - Palette
-0217+  84C0             ;D - Colors count
-0218+  84C0             ;E - Start color number
-0219+  84C0             ;A - Palette number
-0220+  84C0             SetPalette: 
-0221+  84C0 F3          	di
-0222+  84C1 E5          	push	hl
-0223+  84C2 D5          	push	de
-0224+  84C3 C5          	push	bc	
-0225+  84C4 06 FF       	LD	B,0xff
-0226+  84C6 0E A4       	LD	C,Bios.SetPalette
-0227+  84C8 CF          	RST	0x08
-0228+  84C9 C1          	pop	bc
-0229+  84CA D1          	pop	de
-0230+  84CB E1          	pop	hl
-0231+  84CC FB          	ei
-0232+  84CD C9          	RET
-0233+  84CE             
-0234+  84CE             ;Копирует весь основ экран в теневой
-0235+  84CE             CopyBackground: 	
-0236+  84CE F3                  di
-0237+  84CF DB E2               IN A,(EmmWin.P3)
-0238+  84D1 F5          	PUSH AF
-0239+  84D2 3E 50       	LD A,#50
-0240+  84D4 D3 E2       	OUT (EmmWin.P3),A
-0241+  84D6 21 00 C0    	ld hl,#c000
-0242+  84D9 11 40 C1            ld de,#c140
-0243+  84DC 01 40 01            ld bc,#140
-0244+  84DF 52                  ld d,d
-0245+  84E0 3E 00               ld a,0
-0246+  84E2 7F          .loop:   ld a,a
-0247+  84E3 7E                  ld a,(hl)
-0248+  84E4 12          	ld (de),a
-0249+  84E5 40                  ld b,b
-0250+  84E6 23          	inc hl
-0251+  84E7 13          	inc de
-0252+  84E8 0B          	dec bc
-0253+  84E9 78          	ld a,b
-0254+  84EA B1          	or c
-0255+  84EB 20 F5       	jr nz,.loop
-0256+  84ED F1          	pop af
-0257+  84EE D3 E2       	OUT (EmmWin.P3),A
-0258+  84F0 FB                  ei
-0259+  84F1 C9                  ret
-0260+  84F2             ;Восстанавливает из основного ОЗУ в Видео ОЗУ прямоугольник (при использовании режима записи только в VRAM bit 2)
-0261+  84F2             ;HL - Addr
-0262+  84F2             ;B - Len
-0263+  84F2             ;C - Height
-0264+  84F2             ;A - Y
-0265+  84F2             RestoreRect: 
-0266+  84F2 08          	ex af,af'
-0267+  84F3 DB E2       	IN A,(EmmWin.P3)
-0268+  84F5 F5          	push af
-0269+  84F6 3E 50       	LD A,#50
-0270+  84F8 D3 E2       	OUT (EmmWin.P3),A
-0271+  84FA DB C9       	in a,(RGMOD)
-0272+  84FC E6 01       	and 1
-0273+  84FE 20 04       	jr nz,.firstpg
-0274+  8500 11 40 01    	ld de,#0140
-0275+  8503 19          	add hl,de
-0276+  8504             .firstpg: 
-0277+  8504 79          	ld a,c
-0278+  8505 32 0F 85    	ld (.hgt),a
-0279+  8508 F3          	di
-0280+  8509 08          	ex af,af'
-0281+  850A             .loop: 	
-0282+  850A D3 89       	out (Y_PORT),a
-0283+  850C 3C          	inc a
-0284+  850D 52          	ld d,d
-0285+  850E 0E 00       	ld c,0
-0286+  8510             .hgt: 	equ $-1
-0287+  8510 6D          	ld l,l
-0288+  8511 4E          	ld c,(hl)
-0289+  8512 71          	ld (hl),c
-0290+  8513 40          	ld b,b
-0291+  8514 10 F4       	djnz .loop
-0292+  8516 F1          	pop af
-0293+  8517 D3 E2       	out (EmmWin.P3),a
-0294+  8519 FB          	ei
-0295+  851A C9          	ret	
-0296+  851B             
-0297+  851B             
-0298+  851B             ;Восстанавливает из теневого экрана прямоугольник
-0299+  851B             ;HL - Addr
-0300+  851B             ;B - Len
-0301+  851B             ;C - Height
-0302+  851B             ;A - Y
-0303+  851B             RestoreBackground: 
-0304+  851B 08          	ex af,af'
-0305+  851C DB E2       	IN A,(EmmWin.P3)
-0306+  851E F5          	push af
-0307+  851F 3E 50       	LD A,#50
-0308+  8521 D3 E2       	OUT (EmmWin.P3),A
-0309+  8523 79          	ld a,c
-0310+  8524 32 34 85    	ld (.hgt),a	
-0311+  8527 E5          	push hl
-0312+  8528 11 40 01    	ld de,#140
-0313+  852B 19          	add hl,de
-0314+  852C D1          	pop de
-0315+  852D F3          	di
-0316+  852E 08          .loop: 	ex af,af'
-0317+  852F D3 89       	out (Y_PORT),a
-0318+  8531 08          	ex af,af'
-0319+  8532 52          	ld d,d
-0320+  8533 3E 00       	ld a,0
-0321+  8535             .hgt: 	equ $-1
-0322+  8535 7F          	ld a,a
-0323+  8536 7E          	ld a,(hl)
-0324+  8537 12          	ld (de),a
-0325+  8538 40          	ld b,b
-0326+  8539 23          	inc hl
-0327+  853A 13          	inc de
-0328+  853B 10 F1       	djnz .loop
-0329+  853D F1          	pop af
-0330+  853E D3 E2       	out (EmmWin.P3),a
-0331+  8540 FB          	ei
-0332+  8541 C9          	ret
-0333+  8542             
-0334+  8542             ;HL - buffer
-0335+  8542             ResetPallete: 
-0336+  8542 E5          	push hl
-0337+  8543 AF          	xor a
-0338+  8544 06 FF       	ld b,255
-0339+  8546 0E 04       .cls1: 	ld c,4
-0340+  8548 77          .cls: 	ld (hl),a
-0341+  8549 23          	inc hl
-0342+  854A 0D          	dec c
-0343+  854B 20 FB       	jr nz,.cls
-0344+  854D 10 F7       	djnz .cls1
-0345+  854F E1          	pop hl
-0346+  8550 11 00 FF    	ld de,#ff00
-0347+  8553 AF          	xor a
-0348+  8554 CD C0 84    	call SetPalette
-0349+  8557 C9          	ret
-0350+  8558             
-0351+  8558             ;HL - current pallette
-0352+  8558             ;DE - buffer
-0353+  8558             ;B - Colors count
-0354+  8558             ;C - Start color number
-0355+  8558             UnfadePallete: 
-0356+  8558 FB          	ei
-0357+  8559 E5          	push hl
-0358+  855A D5          	push de
-0359+  855B C5          	push bc
-0360+  855C AF          	xor a
-0361+  855D 0E 04       .cls1: 	ld c,4
-0362+  855F 12          .cls: 	ld (de),a
-0363+  8560 13          	inc de
-0364+  8561 0D          	dec c
-0365+  8562 20 FB       	jr nz,.cls
-0366+  8564 10 F7       	djnz .cls1
-0367+  8566 D1          	pop de
-0368+  8567 E1          	pop hl
-0369+  8568 D5          	push de
-0370+  8569 AF          	xor a
-0371+  856A CD C0 84    	call SetPalette
-0372+  856D 76          	halt
-0373+  856E C1          	pop bc
-0374+  856F EB          	ex de,hl
-0375+  8570 E1          	pop hl
-0376+  8571 3E 40       	ld a,64	
-0377+  8573             .unfadeloop: 
-0378+  8573 F5          	push af
-0379+  8574 E5          	push hl
-0380+  8575 D5          	push de
-0381+  8576 C5          	push bc
-0382+  8577 C5          	push bc
-0383+  8578 D5          	push de
-0384+  8579 0E 03       .loop1: 	ld c,3
-0385+  857B 1A          .loop: 	ld a,(de)
-0386+  857C C6 04       	add 4
-0387+  857E BE          	cp (hl)
-0388+  857F 38 01       	jr c,.next
-0389+  8581 7E          	ld a,(hl)
-0390+  8582 12          .next: 	ld (de),a
-0391+  8583 23          	inc hl
-0392+  8584 13          	inc de
-0393+  8585 0D          	dec c
-0394+  8586 20 F3       	jr nz,.loop
-0395+  8588 23          	inc hl
-0396+  8589 13          	inc de
-0397+  858A 10 ED       	djnz .loop1
-0398+  858C E1          	pop hl
-0399+  858D D1          	pop de
-0400+  858E 76          	halt
-0401+  858F AF          	xor a
-0402+  8590 CD C0 84    	call SetPalette
-0403+  8593 C1          	pop bc
-0404+  8594 D1          	pop de
-0405+  8595 E1          	pop hl
-0406+  8596 F1          	pop af
-0407+  8597 3D          	dec a
-0408+  8598 20 D9       	jr nz,.unfadeloop
-0409+  859A C5          	push bc
-0410+  859B D1          	pop de
-0411+  859C AF          	xor a
-0412+  859D CD C0 84    	call SetPalette
-0413+  85A0 C9          	ret
-0414+  85A1             
-0415+  85A1             ;HL - temp buffer with current pallette
-0416+  85A1             ;D - Colors count
-0417+  85A1             ;E - Start color number
-0418+  85A1             FadePallete: 
-0419+  85A1 FB          	ei
-0420+  85A2 3E 40       	ld a,64
-0421+  85A4             .fadeloop: 
-0422+  85A4 F5          	push af
-0423+  85A5 E5          	push hl
-0424+  85A6 42          	ld b,d
-0425+  85A7 0E 03       .loop1: 	ld c,3
-0426+  85A9 7E          .loop: 	ld a,(hl)
-0427+  85AA D6 04       	sub 4
-0428+  85AC 30 01       	jr nc,.next
-0429+  85AE AF          	xor a
-0430+  85AF 77          .next: 	ld (hl),a
-0431+  85B0 23          	inc hl
-0432+  85B1 0D          	dec c
-0433+  85B2 20 F5       	jr nz,.loop
-0434+  85B4 23          	inc hl
-0435+  85B5 10 F0       	djnz .loop1
-0436+  85B7 E1          	pop hl
-0437+  85B8 76          	halt
-0438+  85B9 97                  sub a
-0439+  85BA CD C0 84    	call SetPalette
-0440+  85BD F1          	pop af
-0441+  85BE 3D          	dec a
-0442+  85BF 20 E3       	jr nz,.fadeloop
-0443+  85C1 C9          	ret
-0444+  85C2             
-0445+  85C2             ADDR: 	EQU	#C000
-0446+  85C2             OldVideoMode: 
-0447+  85C2 00          	DB	0
-0448+  85C3             OldVideoPage: 
-0449+  85C3 00          	DB	0
-0402   85C4                             include "sys_utils.asm"
-0001+  85C4             WaitSpaceKey: 
-0002+  85C4             .loop
-0003+  85C4 0E 31       	ld	c,Dss.ScanKey
-0004+  85C6 D7          	rst	#10
-0005+  85C7 28 FB       	jr	z,.loop
-0006+  85C9 FE 20       	cp	#20
-0007+  85CB C8          	ret	z
-0008+  85CC FE 1B       	cp	#1B
-0009+  85CE 20 F4       	jr	nz,.loop
-0010+  85D0 37          	scf
-0011+  85D1 C9                  ret
-0012+  85D2             
-0013+  85D2             CheckKeys: 
-0014+  85D2 0E 31       	ld	c,Dss.ScanKey
-0015+  85D4 D7          	rst	#10
-0016+  85D5 C8          	ret	z
-0017+  85D6 FE 1B       	cp	#1B
-0018+  85D8 C0          	ret	nz
-0019+  85D9 37          	scf
-0020+  85DA C9                  ret
-0021+  85DB             
-0022+  85DB             ; процедура сохранения страницы в указнном окне.
-0023+  85DB             ; C = окно (порт)
-0024+  85DB             ; HL = куда сохранять.
-0025+  85DB ED 78       SavePage: 	in a,(c)
-0026+  85DD 77          		ld (hl),a
-0027+  85DE C9          		ret
-0028+  85DF             
-0029+  85DF             ; процедура восстановления страницы в указнном окне.
-0030+  85DF             ; C = окно (порт)
-0031+  85DF             ; HL = от куда восстановить.
-0032+  85DF 7E          RestorePage: 	ld a,(hl)
-0033+  85E0 ED 79       		out (c),a
-0034+  85E2 C9          		ret
-0403   85E3                             include "im2_utils.asm"
-0001+  85E3             ;Установка IM2 и нового вектора прерываний
-0002+  85E3             ;DE - обработчик прерываний
-0003+  85E3             set_im2: 
-0004+  85E3                     ;устанавливаем адрес процедуры перехватчик прерываний
-0005+  85E3             	; LD	de,im2_handler
-0006+  85E3 21 FF 80    	LD	hl,#80FF
-0007+  85E6 73          	LD	(hl),e
-0008+  85E7 23          	INC	hl
-0009+  85E8 72          	LD	(hl),d
-0010+  85E9             
-0011+  85E9             	;запуск режима IM2
-0012+  85E9 ED 57       	LD	a,i           	;сохранение
-0013+  85EB 32 F9 85    	LD	(set_im1.save_i),a  ;     регистра прерываний
-0014+  85EE 3E 80       	LD	a,#80
-0015+  85F0 F3          	DI
-0016+  85F1 ED 47       	LD	i,a		;i=#80
-0017+  85F3 ED 5E       	IM	2
-0018+  85F5 FB          	EI
-0019+  85F6 C9                  ret
-0020+  85F7             ;Восстановление режима IM1 и предыдущего значения вектора прерываний
-0021+  85F7             set_im1: 
-0022+  85F7 F3                  di
-0023+  85F8 3E 00               ld      a,0
-0024+  85FA             .save_i:  equ    $-1
-0025+  85FA ED 47               ld      i,a
-0026+  85FC ED 56               im      1
-0027+  85FE FB                  ei
-0028+  85FF C9                  ret
-0029+  8600             
-0030+  8600             
-0404   8600                             
-0405   8600             Palette: 
-0406   8600                             include "res_pal.asm"
-0001+  8600                     ;Palette of 146 colors
-0002+  8600 92                  db  146
-0003+  8601 C9 C0 54 00         db  0xC9, 0xC0, 0x54, 0x00
-0004+  8605 75 E0 64 00         db  0x75, 0xE0, 0x64, 0x00
-0005+  8609 98 D7 DE 00         db  0x98, 0xD7, 0xDE, 0x00
-0006+  860D DA FB E9 00         db  0xDA, 0xFB, 0xE9, 0x00
-0007+  8611 CA C2 56 00         db  0xCA, 0xC2, 0x56, 0x00
-0008+  8615 DA FA E6 00         db  0xDA, 0xFA, 0xE6, 0x00
-0009+  8619 D9 F9 E3 00         db  0xD9, 0xF9, 0xE3, 0x00
-0010+  861D CC CB 73 00         db  0xCC, 0xCB, 0x73, 0x00
-0011+  8621 D9 FB E8 00         db  0xD9, 0xFB, 0xE8, 0x00
-0012+  8625 C8 E8 BF 00         db  0xC8, 0xE8, 0xBF, 0x00
-0013+  8629 C8 E6 BB 00         db  0xC8, 0xE6, 0xBB, 0x00
-0014+  862D D6 DC A3 00         db  0xD6, 0xDC, 0xA3, 0x00
-0015+  8631 D8 DC A5 00         db  0xD8, 0xDC, 0xA5, 0x00
-0016+  8635 D8 DE A8 00         db  0xD8, 0xDE, 0xA8, 0x00
-0017+  8639 C9 ED CF 00         db  0xC9, 0xED, 0xCF, 0x00
-0018+  863D D5 DB A1 00         db  0xD5, 0xDB, 0xA1, 0x00
-0019+  8641 C8 ED D1 00         db  0xC8, 0xED, 0xD1, 0x00
-0020+  8645 D1 F0 E2 00         db  0xD1, 0xF0, 0xE2, 0x00
-0021+  8649 D0 EF E0 00         db  0xD0, 0xEF, 0xE0, 0x00
-0022+  864D D8 DC A2 00         db  0xD8, 0xDC, 0xA2, 0x00
-0023+  8651 D5 DA 9D 00         db  0xD5, 0xDA, 0x9D, 0x00
-0024+  8655 D3 DB A0 00         db  0xD3, 0xDB, 0xA0, 0x00
-0025+  8659 C5 E4 B6 00         db  0xC5, 0xE4, 0xB6, 0x00
-0026+  865D D1 EF DE 00         db  0xD1, 0xEF, 0xDE, 0x00
-0027+  8661 C8 EE D4 00         db  0xC8, 0xEE, 0xD4, 0x00
-0028+  8665 D0 ED DA 00         db  0xD0, 0xED, 0xDA, 0x00
-0029+  8669 D7 DC A5 00         db  0xD7, 0xDC, 0xA5, 0x00
-0030+  866D C5 E6 BA 00         db  0xC5, 0xE6, 0xBA, 0x00
-0031+  8671 C3 E6 BC 00         db  0xC3, 0xE6, 0xBC, 0x00
-0032+  8675 D8 DB 9E 00         db  0xD8, 0xDB, 0x9E, 0x00
-0033+  8679 C8 E4 B1 00         db  0xC8, 0xE4, 0xB1, 0x00
-0034+  867D CC EB CC 00         db  0xCC, 0xEB, 0xCC, 0x00
-0035+  8681 C8 E4 B6 00         db  0xC8, 0xE4, 0xB6, 0x00
-0036+  8685 D3 DA 9C 00         db  0xD3, 0xDA, 0x9C, 0x00
-0037+  8689 D1 EC D7 00         db  0xD1, 0xEC, 0xD7, 0x00
-0038+  868D C9 EB CE 00         db  0xC9, 0xEB, 0xCE, 0x00
-0039+  8691 C5 EE D4 00         db  0xC5, 0xEE, 0xD4, 0x00
-0040+  8695 D6 D9 9A 00         db  0xD6, 0xD9, 0x9A, 0x00
-0041+  8699 C5 E4 B2 00         db  0xC5, 0xE4, 0xB2, 0x00
-0042+  869D C2 E5 BA 00         db  0xC2, 0xE5, 0xBA, 0x00
-0043+  86A1 C8 EF D8 00         db  0xC8, 0xEF, 0xD8, 0x00
-0044+  86A5 C5 E3 B1 00         db  0xC5, 0xE3, 0xB1, 0x00
-0045+  86A9 D0 EB D0 00         db  0xD0, 0xEB, 0xD0, 0x00
-0046+  86AD C8 ED D4 00         db  0xC8, 0xED, 0xD4, 0x00
-0047+  86B1 CE EF DD 00         db  0xCE, 0xEF, 0xDD, 0x00
-0048+  86B5 C2 E4 B6 00         db  0xC2, 0xE4, 0xB6, 0x00
-0049+  86B9 C5 EC CF 00         db  0xC5, 0xEC, 0xCF, 0x00
-0050+  86BD C2 E3 B1 00         db  0xC2, 0xE3, 0xB1, 0x00
-0051+  86C1 CF D9 9A 00         db  0xCF, 0xD9, 0x9A, 0x00
-0052+  86C5 C5 EB CD 00         db  0xC5, 0xEB, 0xCD, 0x00
-0053+  86C9 CE EC DA 00         db  0xCE, 0xEC, 0xDA, 0x00
-0054+  86CD C4 ED D1 00         db  0xC4, 0xED, 0xD1, 0x00
-0055+  86D1 D1 D9 9B 00         db  0xD1, 0xD9, 0x9B, 0x00
-0056+  86D5 CD EB D6 00         db  0xCD, 0xEB, 0xD6, 0x00
-0057+  86D9 CB EB D8 00         db  0xCB, 0xEB, 0xD8, 0x00
-0058+  86DD C7 EB D4 00         db  0xC7, 0xEB, 0xD4, 0x00
-0059+  86E1 BF E4 B3 00         db  0xBF, 0xE4, 0xB3, 0x00
-0060+  86E5 BE EB C9 00         db  0xBE, 0xEB, 0xC9, 0x00
-0061+  86E9 BB E2 AC 00         db  0xBB, 0xE2, 0xAC, 0x00
-0062+  86ED CC D8 93 00         db  0xCC, 0xD8, 0x93, 0x00
-0063+  86F1 C2 EA C8 00         db  0xC2, 0xEA, 0xC8, 0x00
-0064+  86F5 C3 EC CB 00         db  0xC3, 0xEC, 0xCB, 0x00
-0065+  86F9 CD D8 96 00         db  0xCD, 0xD8, 0x96, 0x00
-0066+  86FD BF EB CD 00         db  0xBF, 0xEB, 0xCD, 0x00
-0067+  8701 C2 EC D0 00         db  0xC2, 0xEC, 0xD0, 0x00
-0068+  8705 CF EF E0 00         db  0xCF, 0xEF, 0xE0, 0x00
-0069+  8709 CA EB D5 00         db  0xCA, 0xEB, 0xD5, 0x00
-0070+  870D BF EC CD 00         db  0xBF, 0xEC, 0xCD, 0x00
-0071+  8711 C2 EC CE 00         db  0xC2, 0xEC, 0xCE, 0x00
-0072+  8715 BD E3 B0 00         db  0xBD, 0xE3, 0xB0, 0x00
-0073+  8719 C3 EA CE 00         db  0xC3, 0xEA, 0xCE, 0x00
-0074+  871D 84 CD 74 00         db  0x84, 0xCD, 0x74, 0x00
-0075+  8721 81 CC 6F 00         db  0x81, 0xCC, 0x6F, 0x00
-0076+  8725 D2 D7 99 00         db  0xD2, 0xD7, 0x99, 0x00
-0077+  8729 C2 EA C6 00         db  0xC2, 0xEA, 0xC6, 0x00
-0078+  872D BC EA C5 00         db  0xBC, 0xEA, 0xC5, 0x00
-0079+  8731 81 CC 6A 00         db  0x81, 0xCC, 0x6A, 0x00
-0080+  8735 80 CB 65 00         db  0x80, 0xCB, 0x65, 0x00
-0081+  8739 81 C9 61 00         db  0x81, 0xC9, 0x61, 0x00
-0082+  873D 84 CB 69 00         db  0x84, 0xCB, 0x69, 0x00
-0083+  8741 C7 D7 90 00         db  0xC7, 0xD7, 0x90, 0x00
-0084+  8745 CF DA 9C 00         db  0xCF, 0xDA, 0x9C, 0x00
-0085+  8749 81 CB 69 00         db  0x81, 0xCB, 0x69, 0x00
-0086+  874D 84 CB 6D 00         db  0x84, 0xCB, 0x6D, 0x00
-0087+  8751 BA E2 AA 00         db  0xBA, 0xE2, 0xAA, 0x00
-0088+  8755 CA D8 91 00         db  0xCA, 0xD8, 0x91, 0x00
-0089+  8759 BC E9 C1 00         db  0xBC, 0xE9, 0xC1, 0x00
-0090+  875D BA E3 B0 00         db  0xBA, 0xE3, 0xB0, 0x00
-0091+  8761 C2 E4 B3 00         db  0xC2, 0xE4, 0xB3, 0x00
-0092+  8765 B7 E2 AA 00         db  0xB7, 0xE2, 0xAA, 0x00
-0093+  8769 BE E4 B6 00         db  0xBE, 0xE4, 0xB6, 0x00
-0094+  876D CA D7 8E 00         db  0xCA, 0xD7, 0x8E, 0x00
-0095+  8771 D3 D7 97 00         db  0xD3, 0xD7, 0x97, 0x00
-0096+  8775 C9 D8 8F 00         db  0xC9, 0xD8, 0x8F, 0x00
-0097+  8779 7D CB 65 00         db  0x7D, 0xCB, 0x65, 0x00
-0098+  877D 7D DF 6D 00         db  0x7D, 0xDF, 0x6D, 0x00
-0099+  8781 7B DF 6C 00         db  0x7B, 0xDF, 0x6C, 0x00
-0100+  8785 84 C9 67 00         db  0x84, 0xC9, 0x67, 0x00
-0101+  8789 CD D7 91 00         db  0xCD, 0xD7, 0x91, 0x00
-0102+  878D CC D7 8F 00         db  0xCC, 0xD7, 0x8F, 0x00
-0103+  8791 C9 D5 8B 00         db  0xC9, 0xD5, 0x8B, 0x00
-0104+  8795 7D CA 61 00         db  0x7D, 0xCA, 0x61, 0x00
-0105+  8799 7C DD 6A 00         db  0x7C, 0xDD, 0x6A, 0x00
-0106+  879D 7A DD 69 00         db  0x7A, 0xDD, 0x69, 0x00
-0107+  87A1 79 DD 65 00         db  0x79, 0xDD, 0x65, 0x00
-0108+  87A5 BA E9 C2 00         db  0xBA, 0xE9, 0xC2, 0x00
-0109+  87A9 84 CB 71 00         db  0x84, 0xCB, 0x71, 0x00
-0110+  87AD 7E CC 68 00         db  0x7E, 0xCC, 0x68, 0x00
-0111+  87B1 7A CB 61 00         db  0x7A, 0xCB, 0x61, 0x00
-0112+  87B5 7E C8 5F 00         db  0x7E, 0xC8, 0x5F, 0x00
-0113+  87B9 7B C9 5E 00         db  0x7B, 0xC9, 0x5E, 0x00
-0114+  87BD BC E2 AD 00         db  0xBC, 0xE2, 0xAD, 0x00
-0115+  87C1 C7 D7 8E 00         db  0xC7, 0xD7, 0x8E, 0x00
-0116+  87C5 B8 EA C4 00         db  0xB8, 0xEA, 0xC4, 0x00
-0117+  87C9 76 DE 64 00         db  0x76, 0xDE, 0x64, 0x00
-0118+  87CD 75 E0 63 00         db  0x75, 0xE0, 0x63, 0x00
-0119+  87D1 7C DC 66 00         db  0x7C, 0xDC, 0x66, 0x00
-0120+  87D5 7E C7 5D 00         db  0x7E, 0xC7, 0x5D, 0x00
-0121+  87D9 7C C9 5A 00         db  0x7C, 0xC9, 0x5A, 0x00
-0122+  87DD 78 C9 59 00         db  0x78, 0xC9, 0x59, 0x00
-0123+  87E1 78 DB 63 00         db  0x78, 0xDB, 0x63, 0x00
-0124+  87E5 75 DE 63 00         db  0x75, 0xDE, 0x63, 0x00
-0125+  87E9 74 DF 61 00         db  0x74, 0xDF, 0x61, 0x00
-0126+  87ED 74 DE 5F 00         db  0x74, 0xDE, 0x5F, 0x00
-0127+  87F1 84 CC 72 00         db  0x84, 0xCC, 0x72, 0x00
-0128+  87F5 7B CA 65 00         db  0x7B, 0xCA, 0x65, 0x00
-0129+  87F9 77 CA 5F 00         db  0x77, 0xCA, 0x5F, 0x00
-0130+  87FD 75 C9 59 00         db  0x75, 0xC9, 0x59, 0x00
-0131+  8801 72 C9 58 00         db  0x72, 0xC9, 0x58, 0x00
-0132+  8805 B6 E2 A7 00         db  0xB6, 0xE2, 0xA7, 0x00
-0133+  8809 B6 EA C0 00         db  0xB6, 0xEA, 0xC0, 0x00
-0134+  880D 74 DC 5E 00         db  0x74, 0xDC, 0x5E, 0x00
-0135+  8811 73 C7 58 00         db  0x73, 0xC7, 0x58, 0x00
-0136+  8815 76 C7 5A 00         db  0x76, 0xC7, 0x5A, 0x00
-0137+  8819 70 C9 57 00         db  0x70, 0xC9, 0x57, 0x00
-0138+  881D 6F C9 57 00         db  0x6F, 0xC9, 0x57, 0x00
-0139+  8821 72 DC 5E 00         db  0x72, 0xDC, 0x5E, 0x00
-0140+  8825 6F CA 57 00         db  0x6F, 0xCA, 0x57, 0x00
-0141+  8829 72 DB 5E 00         db  0x72, 0xDB, 0x5E, 0x00
-0142+  882D 6F CB 58 00         db  0x6F, 0xCB, 0x58, 0x00
-0143+  8831 47 38 54 00         db  0x47, 0x38, 0x54, 0x00
-0144+  8835 91 FA E4 00         db  0x91, 0xFA, 0xE4, 0x00
-0145+  8839 3A BD 75 00         db  0x3A, 0xBD, 0x75, 0x00
-0146+  883D 61 E4 9E 00         db  0x61, 0xE4, 0x9E, 0x00
-0147+  8841 29 7E 56 00         db  0x29, 0x7E, 0x56, 0x00
-0148+  8845 54 A7 D6 00         db  0x54, 0xA7, 0xD6, 0x00
-0149+  8849             
-0407   8849             PaletteEnd: 
-0408   8849                             
-0409   8849             
-0410   8849             AppDir: 	        equ ($/80h)*80h+80h
-0411   8849             AssetsDir: 	equ AppDir + 128
-0412   8849             code_end: 
-0413   8849             
-0414   8849                             org 0xC000
-0415   C000             PlayerStart: 
-0416   C000                             include "pt3play.asm"
+0087   8189 CD FD 81                    call FillScreen
+0088   818C CD 44 82                    call DrawCity
+0089   818F 3E 01                       ld a,1
+0090   8191 32 58 83                    ld (Im2Handler.needChangePage),a        ;Переключаем основной экран на 1
+0091   8194 FB                          ei
+0092   8195 76                          halt
+0093   8196 CD FD 81                    call FillScreen
+0094   8199 CD 44 82                    call DrawCity
+0095   819C DB C9                       in a,(RGMOD)
+0096   819E A7                          and a
+0097   819F 3E 01                       ld a,1
+0098   81A1 20 03                       jr nz,.loop
+0099   81A3 32 58 83                    ld (Im2Handler.needChangePage),a        ;Переключаем основной экран на 1
+0100   81A6 FB          .loop:           ei
+0101   81A7 76                          halt
+0102   81A8                             ; call Update0Screen
+0103   81A8                             ; call UpdateScreenFlag
+0104   81A8 CD 48 86                    call CheckKeys
+0105   81AB D2 A6 81                    jp nc,.loop
+0106   81AE             
+0107   81AE             .exit: 
+0108   81AE DB C9                       in a,(RGMOD)
+0109   81B0 E6 01                       and 1                
+0110   81B2 C4 69 84                    call nz,ChangeVideoPage
+0111   81B5                             ; ld hl,Palette+1
+0112   81B5                             ; ld de,TempPal
+0113   81B5                             ; push de
+0114   81B5                             ; ld bc,256*4
+0115   81B5                             ; ldir
+0116   81B5                             ; pop hl
+0117   81B5                             ; ld a,(Palette)
+0118   81B5                             ; ld d,a
+0119   81B5                             ; ld e,0                
+0120   81B5                             ; call FadePallete
+0121   81B5 CD 2F 83                    call PlayerMute
+0122   81B8 CD 6D 86                    call set_im1
+0123   81BB CD 60 84                    call RestoreVideoMode
+0124   81BE CD D9 82                    call RestorePages
+0125   81C1 01 41 00                    ld bc,Dss.Exit
+0126   81C4 D7          	        rst #10
+0127   81C5 C9          	        ret
+0128   81C6             
+0129   81C6 E1          .error:          pop hl
+0130   81C7 D1                          pop de
+0131   81C8 C1                          pop bc
+0132   81C9 C3 F4 82                    jp  FileReadError
+0133   81CC             
+0134   81CC             ;Обновляем флаг необходимости смены основного экрана
+0135   81CC             UpdateScreenFlag: 
+0136   81CC 3E 01                       ld a,1
+0137   81CE 32 58 83                    ld (Im2Handler.needChangePage),a
+0138   81D1 C9                          ret
+0139   81D2             
+0140   81D2 1A          LoadResource:    ld  a,(de)
+0141   81D3 D3 E2                       out (EmmWin.P3),a
+0142   81D5 E5                          push hl
+0143   81D6 0E 5C                       ld c,Dss.PChars
+0144   81D8 D7                          rst #10
+0145   81D9 21 10 84                    ld hl,CrLf
+0146   81DC 0E 5C                       ld c,Dss.PChars
+0147   81DE D7                          rst #10
+0148   81DF E1                          pop hl
+0149   81E0 AF                          xor a
+0150   81E1 0E 11       	        ld c,Dss.Open
+0151   81E3 D7          	        rst #10
+0152   81E4 D8          	        ret c
+0153   81E5 32 14 84    	        ld (fHandler),A
+0154   81E8 21 00 C0                    LD	HL,ADDR
+0155   81EB 11 00 40    	        LD	DE,#4000
+0156   81EE 3A 14 84    	        LD	A,(fHandler)
+0157   81F1 0E 13       	        LD	C,Dss.Read
+0158   81F3 D7          	        RST	#10
+0159   81F4 F5                          push af
+0160   81F5 3A 14 84                    LD	A,(fHandler)
+0161   81F8 0E 12                       ld c,Dss.Close
+0162   81FA D7                          rst #10
+0163   81FB F1                          pop af
+0164   81FC C9                          ret
+0165   81FD             
+0166   81FD DB E2       FillScreen:      in a,(EmmWin.P3)
+0167   81FF F5                          push af
+0168   8200 3E 50                       ld a,#50
+0169   8202 D3 E2                       out (EmmWin.P3),a
+0170   8204 01 40 01                    ld bc,320
+0171   8207 DB C9                       in a,(RGMOD)
+0172   8209 21 00 C0                    ld hl,#c000
+0173   820C E6 01                       and 1
+0174   820E 28 03                       jr z,.firstScreen
+0175   8210 21 40 C1                    ld hl,#c140
+0176   8213             .firstScreen:    
+0177   8213 06 96                       ld b,150
+0178   8215 AF                          xor a
+0179   8216 D3 89       .loop1:          out (Y_PORT),a
+0180   8218 36 00                       ld (hl),0
+0181   821A 3C                          inc a
+0182   821B 10 F9                       djnz .loop1
+0183   821D 06 46                       ld b,70
+0184   821F D3 89       .loop2:          out (Y_PORT),a
+0185   8221 36 01                       ld (hl),1
+0186   8223 3C                          inc a
+0187   8224 10 F9                       djnz .loop2
+0188   8226 06 24                       ld b,36
+0189   8228 D3 89       .loop3:          out (Y_PORT),a
+0190   822A 36 02                       ld (hl),2
+0191   822C 3C                          inc a
+0192   822D 10 F9                       djnz .loop3
+0193   822F             ;TODO: check on real this example                
+0194   822F                             ; ld d,d
+0195   822F                             ; ld a,100        ;sky height
+0196   822F                             ; ld e,e
+0197   822F                             ; ld (hl),0
+0198   822F                             ; ld b,b
+0199   822F                             ; ld a,99
+0200   822F                             ; out (Y_PORT),a
+0201   822F                             ; ld d,d
+0202   822F                             ; ld a,100        ;grass height
+0203   822F                             ; ld e,e
+0204   822F                             ; ld (hl),1
+0205   822F                             ; ld b,b
+0206   822F             
+0207   822F                             ; ld a,199        ;grass Y pos
+0208   822F                             ; out (Y_PORT),a
+0209   822F                             ; ld d,d
+0210   822F                             ; ld a,56         ;wall height
+0211   822F                             ; ld e,e
+0212   822F                             ; ld (hl),2
+0213   822F                             ; ld b,b
+0214   822F F3                          di
+0215   8230 AF                          xor a
+0216   8231 D3 89                       out (Y_PORT),a
+0217   8233 54                          ld d,h
+0218   8234 5D                          ld e,l
+0219   8235 13                          inc de
+0220   8236 01 3F 01                    ld bc,#140-1
+0221   8239 52                          ld d,d         ;copy vertical lines
+0222   823A 3E 00                       ld a,0
+0223   823C 7F                          ld a,a
+0224   823D ED B0                       ldir
+0225   823F 40                          ld b,b
+0226   8240 F1                          pop af
+0227   8241 D3 E2                       out (EmmWin.P3),a
+0228   8243 C9                          ret
+0229   8244             
+0230   8244             DrawCity:        
+0231   8244 DB A2                       IN A,(EmmWin.P1)
+0232   8246 F5                          push af
+0233   8247 DB E2                       IN A,(EmmWin.P3)
+0234   8249 F5                          push af
+0235   824A 3E 50                       LD A,#50
+0236   824C D3 A2                       OUT (EmmWin.P1),A
+0237   824E 3A 15 84                    ld a,(MemoryBuffer.memCity)
+0238   8251 D3 E2                       out (EmmWin.P3),a
+0239   8253 21 00 40                    ld hl,#4000
+0240   8256 DB C9                       in a,(RGMOD)
+0241   8258 E6 01                       and 1
+0242   825A 20 11                       jr nz,.firstpg
+0243   825C 21 40 41                    ld hl,#4140
+0244   825F 11 8A 00                    ld de,138
+0245   8262 22 80 82                    ld (.adr1),hl
+0246   8265 19                          add hl,de
+0247   8266 22 8A 82                    ld (.adr2),hl
+0248   8269 19                          add hl,de
+0249   826A 22 91 82                    ld (.adr3),hl
+0250   826D 21 00 C0    .firstpg:        ld hl,#c000     ;city sprite
+0251   8270 3E 00                       ld a,0
+0252   8272             .pos:            equ $-1
+0253   8272 4F                          ld c,a
+0254   8273 06 00                       ld b,0
+0255   8275 09                          add hl,bc
+0256   8276 06 27                       ld b,39         ;city hgt
+0257   8278 3E 96                       ld a,150        ;city Y pos
+0258   827A C5          .loop: 	        PUSH BC
+0259   827B F5                          push af
+0260   827C D3 89                       OUT (#89),A
+0261   827E F3                          di
+0262   827F 11 00 00                    ld de,0
+0263   8282             .adr1:           equ $-2                
+0264   8282 52                          ld d,d		;enable accel, set buffer size
+0265   8283 3E 8A                       ld a,138        ;pattern lenght
+0266   8285 6D                          ld l,l
+0267   8286 7E                          ld a,(hl)
+0268   8287 12                          ld (de),a
+0269   8288 40                          ld b,b
+0270   8289             
+0271   8289 11 00 00                    ld de,0
+0272   828C             .adr2:           equ $-2
+0273   828C 6D                          ld l,l
+0274   828D 7E                          ld a,(hl)
+0275   828E 12                          ld (de),a
+0276   828F 40                          ld b,b
+0277   8290             
+0278   8290 11 00 00                    ld de,0
+0279   8293             .adr3:           equ $-2
+0280   8293 52                          ld d,d
+0281   8294 3E 2C                       ld a,44
+0282   8296 6D                          ld l,l
+0283   8297 7E                          ld a,(hl)
+0284   8298 12                          ld (de),a
+0285   8299 40                          ld b,b
+0286   829A FB                          ei
+0287   829B 01 14 01                    ld bc,276
+0288   829E 09                          add hl,bc
+0289   829F F1                          pop af
+0290   82A0 C1                          POP BC
+0291   82A1 3C                          INC A
+0292   82A2 10 D6                       DJNZ .loop
+0293   82A4 F1                          pop af
+0294   82A5 D3 E2                       OUT (EmmWin.P3),A
+0295   82A7 F1                          pop af
+0296   82A8 D3 A2                       OUT (EmmWin.P1),A
+0297   82AA C9                          RET
+0298   82AB D5          CoordToAddrP3:   push de
+0299   82AC 11 00 C0                    ld de,#c000
+0300   82AF 19                          add hl,de
+0301   82B0 D1                          pop de
+0302   82B1 C9                          ret
+0303   82B2             
+0304   82B2 D5          CoordToAddrP1:   push de
+0305   82B3 11 00 40                    ld de,#4000
+0306   82B6 19                          add hl,de
+0307   82B7 D1                          pop de
+0308   82B8 C9                          ret
+0309   82B9             
+0310   82B9 7E          FindNextName:    ld a,(hl)
+0311   82BA 23                          inc hl
+0312   82BB A7                          and a
+0313   82BC C8                          ret z
+0314   82BD 18 FA                       jr FindNextName
+0315   82BF             
+0316   82BF             ;Сохранение номеров страниц при запуске
+0317   82BF 21 3D 84    SavePages:       ld hl,Pages
+0318   82C2 3E 82                       ld a,EmmWin.P0
+0319   82C4 CD 51 86                    call SavePage
+0320   82C7 23                          inc hl
+0321   82C8 3E A2                       ld a,EmmWin.P1
+0322   82CA CD 51 86                    call SavePage
+0323   82CD 23                          inc hl
+0324   82CE 3E C2                       ld a,EmmWin.P2
+0325   82D0 CD 51 86                    call SavePage
+0326   82D3 23                          inc hl
+0327   82D4 3E E2                       ld a,EmmWin.P3
+0328   82D6 C3 51 86                    jp SavePage
+0329   82D9             
+0330   82D9             ;Восстановление номеров страниц при завершении
+0331   82D9             RestorePages: 
+0332   82D9 21 3D 84                    ld hl, Pages
+0333   82DC 3E 82                       ld a,EmmWin.P0
+0334   82DE CD 55 86                    call RestorePage
+0335   82E1 23                          inc hl
+0336   82E2 3E A2                       ld a,EmmWin.P1
+0337   82E4 CD 55 86                    call RestorePage
+0338   82E7 23                          inc hl
+0339   82E8                         ;ld a,cpu_w2
+0340   82E8                         ;call SavePage
+0341   82E8 23                          inc hl
+0342   82E9 3E E2                       ld a,EmmWin.P3
+0343   82EB C3 55 86                    jp RestorePage
+0344   82EE             
+0345   82EE             NotEnoughtMemory: 	
+0346   82EE 21 89 83                    ld hl,NotEnoughtMemoryMessage
+0347   82F1 C3 FD 82        	        jp PrintError
+0348   82F4             
+0349   82F4             FileReadError: 
+0350   82F4 CD D9 82                    call RestorePages
+0351   82F7 21 AA 83                    ld hl,FileReadErrorMessage
+0352   82FA C3 FD 82                    jp PrintError
+0353   82FD             
+0354   82FD             PrintError: 	    
+0355   82FD 0E 5C                       ld c,Dss.PChars			;печатаем
+0356   82FF D7                          rst #10
+0357   8300 CD D9 82                    call RestorePages
+0358   8303 3A 3C 84                    ld a,(MemoryDescriptor)
+0359   8306 A7                          and a
+0360   8307 28 03                       jr z,.next
+0361   8309 0E 3E                       ld c,Dss.FreeMem
+0362   830B D7                          rst #10
+0363   830C 01 41 FF    .next:           ld bc,#FF41
+0364   830F D7                          rst #10
+0365   8310 C3 10 83                    jp $				; привычка...
+0366   8313             
+0367   8313             PlayerInit: 
+0368   8313 DB E2                       in a,(EmmWin.P3)
+0369   8315 F5                          push af
+0370   8316 3E 01                       ld a,1
+0371   8318 32 6B 83                    ld (Im2Handler.musicEnabled),a
+0372   831B 3A 17 84                    ld a,(MemoryBuffer.memMusic)
+0373   831E D3 E2                       out (EmmWin.P3),a
+0374   8320 CD 00 C0                    call PlayerStart
+0375   8323 F1          .exit:           pop af
+0376   8324 D3 E2                       out (EmmWin.P3),a
+0377   8326 C9                          ret
+0378   8327             
+0379   8327 3A 17 84    Player:          ld a,(MemoryBuffer.memMusic)
+0380   832A D3 E2                       out (EmmWin.P3),a
+0381   832C C3 05 C0                    jp PlayerStart+5
+0382   832F             PlayerMute: 
+0383   832F DB E2                       in a,(EmmWin.P3)
+0384   8331 F5                          push af
+0385   8332 3A 6B 83                    ld a,(Im2Handler.musicEnabled)
+0386   8335 EE 01                       xor 1
+0387   8337 32 6B 83                    ld (Im2Handler.musicEnabled),a
+0388   833A 3A 17 84                    ld a,(MemoryBuffer.memMusic)
+0389   833D D3 E2                       out (EmmWin.P3),a
+0390   833F CD 08 C0                    call PlayerStart+8
+0391   8342 18 DF                       jr PlayerInit.exit
+0392   8344             
+0393   8344 F3          Im2Handler:      di
+0394   8345 F5                          push af
+0395   8346 E5                          push hl
+0396   8347 C5                          push bc
+0397   8348 D5                          push de
+0398   8349 DD E5                       push ix
+0399   834B FD E5                       push iy
+0400   834D D9                          exx
+0401   834E 08                          ex af,af'
+0402   834F F5                          push af
+0403   8350 E5                          push hl
+0404   8351 C5                          push bc
+0405   8352 D5                          push de
+0406   8353 DD E5                       push ix
+0407   8355 FD E5                       push iy
+0408   8357 3E 00       	        ld a,0
+0409   8359             .needChangePage:  equ $-1
+0410   8359 A7          	        and a
+0411   835A 28 07       	        jr z,.skip
+0412   835C CD 69 84                    call ChangeVideoPage
+0413   835F AF                          xor a
+0414   8360 32 58 83                    ld (.needChangePage),a
+0415   8363 DB E2       .skip:           in a,(EmmWin.P3)
+0416   8365 F5                          push af
+0417   8366 21 13 84                    ld hl,Counter
+0418   8369 34                          inc (hl)
+0419   836A 3E 00                       ld a,0
+0420   836C             .musicEnabled:   equ $-1
+0421   836C A7                          and a
+0422   836D C4 27 83                    call nz,Player
+0423   8370 F1                          pop af
+0424   8371 D3 E2                       out (EmmWin.P3),a
+0425   8373 FD E1                       pop iy
+0426   8375 DD E1                       pop ix
+0427   8377 D1                          pop de
+0428   8378 C1                          pop bc
+0429   8379 E1                          pop hl
+0430   837A F1                          pop af
+0431   837B 08                          ex af,af'
+0432   837C D9                          exx
+0433   837D FD E1                       pop iy
+0434   837F DD E1                       pop ix
+0435   8381 D1                          pop de
+0436   8382 C1                          pop bc
+0437   8383 E1                          pop hl
+0438   8384 F1                          pop af
+0439   8385 FB                          ei
+0440   8386 C3 38 00                    jp #38
+0441   8389             
+0442   8389             NotEnoughtMemoryMessage: 
+0443   8389                             db cr,lf,"Error: Not enought memory!",cr,lf
+0443   8389 0D0A4572726F723A204E6F7420656E6F75676874206D656D6F7279210D0A
+0444   83A7 0D 0A 00    		db cr,lf,0
+0445   83AA             
+0446   83AA             FileReadErrorMessage: 
+0447   83AA                             db cr,lf,"Error: Can't read file!",cr,lf
+0447   83AA 0D0A4572726F723A2043616E277420726561642066696C65210D0A
+0448   83C5 0D 0A 00    		db cr,lf,0
+0449   83C8             OpenDirErrorMessage: 
+0450   83C8                             db cr,lf,"Error: Can't open ASSETS dir!"
+0450   83C8 0D0A4572726F723A2043616E2774206F70656E204153534554532064697221
+0451   83E7 0D 0A 00    		db cr,lf,0
+0452   83EA             
+0453   83EA             ResourcesLoadingMessage: 
+0454   83EA                             db cr,lf,"Loading resources, please wait ...",cr,lf
+0454   83EA 0D0A4C6F6164696E67207265736F75726365732C20706C656173652077616974
+0454   840A 202E2E2E0D0A
+0455   8410 0D 0A 00    CrLf: 		db cr,lf,0
+0456   8413             
+0457   8413 00          Counter:         db 0
+0458   8414 00          fHandler        db 0
+0459   8415             
+0460   8415             MemoryBuffer: 
+0461   8415 00          .memCity      db 0
+0462   8416 00          .memWay       db 0
+0463   8417 00          .memMusic       db 0
+0464   8418 00                          db 0
+0465   8419 03          assetsBlocks    db 3
+0466   841A             
+0467   841A             AssetsDirName   db "ASSETS",0
+0467   841A 41535345545300
+0468   8421             city            db "city.bin",0
+0468   8421 636974792E62696E00
+0469   842A             way             db "way.bin",0
+0469   842A 7761792E62696E00
+0470   8432             music           db "music.bin",0
+0470   8432 6D757369632E62696E00
+0471   843C             MemoryDescriptor: 
+0472   843C 00                          db 0
+0473   843D             
+0474   843D             ;Страницы, которые были открыты при запуске программы
+0475   843D             Pages: 
+0476   843D 00          Page0:           db 0
+0477   843E 00          Page1:           db 0
+0478   843F 00          Page2:           db 0
+0479   8440 00          Page3:           db 0
+0480   8441             
+0481   8441             CardCoord0:       
+0482   8441 00          .y:              db 0
+0483   8442 00 00       .x:              dw 0
+0484   8444             
+0485   8444             CardCoord1: 
+0486   8444 00          .y:              db 0
+0487   8445 00 00       .x:              dw 0
+0488   8447             
+0489   8447                             include "grx_utils.asm"
+0001+  8447             ChangeVideoMode: 
+0002+  8447 0E 51       	LD	C,Dss.GetVMod
+0003+  8449 D7          	RST	#10
+0004+  844A 32 38 86    	LD	(OldVideoMode),a
+0005+  844D 78          	ld	a,b
+0006+  844E 32 39 86    	ld	(OldVideoPage),a
+0007+  8451 3E 81       	LD	A,#81
+0008+  8453 06 01       	LD	B,1
+0009+  8455 CD 5C 84    	call	SetVideoMode
+0010+  8458 3E 81       	LD	A,#81
+0011+  845A 06 00       	LD	B,0
+0012+  845C             
+0013+  845C             SetVideoMode: 
+0014+  845C 0E 50       	LD	C,Dss.SetVMod
+0015+  845E D7          	RST	#10
+0016+  845F C9          	RET
+0017+  8460             RestoreVideoMode: 
+0018+  8460 3A 39 86    	ld	a,(OldVideoPage)
+0019+  8463 47          	LD	B,a
+0020+  8464 3A 38 86    	LD	a,(OldVideoMode)
+0021+  8467 18 F3       	JR	SetVideoMode
+0022+  8469             
+0023+  8469             ChangeVideoPage: 
+0024+  8469 DB C9       	in	a,(RGMOD)
+0025+  846B EE 01       	xor	1
+0026+  846D D3 C9       	out	(RGMOD),a
+0027+  846F C9          	ret
+0028+  8470             
+0029+  8470             ;BC - откуда
+0030+  8470             ;HL - ширина
+0031+  8470             ;DE - куда
+0032+  8470             ;A - Y координата
+0033+  8470             ;A' - Высота
+0034+  8470             
+0035+  8470             ShowBitmap: 
+0036+  8470 22 92 84    	LD	(.len), HL
+0037+  8473 60          	LD	H,B
+0038+  8474 69          	LD	L,C
+0039+  8475             ;	LD	HL,ADDR+#76
+0040+  8475             ;	LD	DE,#4000
+0041+  8475 08          	EX	AF,AF'
+0042+  8476 47          	LD	B,A
+0043+  8477 DB A2       	IN	A,(EmmWin.P1)
+0044+  8479 F5          	PUSH	AF
+0045+  847A 3E 50       	LD	A,#50
+0046+  847C D3 A2       	OUT	(EmmWin.P1),A
+0047+  847E DB C9       	in a,(RGMOD)
+0048+  8480 E6 01       	and 1
+0049+  8482 28 08       	jr z,.firstpg
+0050+  8484 EB          	ex de,hl
+0051+  8485 D5          	push de
+0052+  8486 11 40 01    	ld de,#0140
+0053+  8489 19          	add hl,de
+0054+  848A D1          	pop de
+0055+  848B EB          	ex de,hl
+0056+  848C             .firstpg: 
+0057+  848C 08          	EX	AF,AF'
+0058+  848D             ;	LD	A,0
+0059+  848D             ;	LD	B,100
+0060+  848D C5          .loop	PUSH	BC
+0061+  848E D5          	PUSH	DE
+0062+  848F D3 89       	OUT	(#89),A
+0063+  8491 01 00 00    	LD	BC,0
+0064+  8494             .len: 	EQU	$-2
+0065+  8494 ED B0       	LDIR
+0066+  8496 D1          	POP	DE
+0067+  8497 C1          	POP	BC
+0068+  8498 3C          	INC	A
+0069+  8499 10 F2       	DJNZ	.loop
+0070+  849B F1          	POP	AF
+0071+  849C D3 A2       	OUT	(EmmWin.P1),A
+0072+  849E C9          	RET
+0073+  849F             
+0074+  849F             ;BC - откуда
+0075+  849F             ;HL - ширина
+0076+  849F             ;DE - куда
+0077+  849F             ;A - Y координата
+0078+  849F             ;A' - Высота
+0079+  849F             
+0080+  849F             ShowBitmapShadow: 
+0081+  849F 22 C1 84    	LD	(.len), HL
+0082+  84A2 60          	LD	H,B
+0083+  84A3 69          	LD	L,C
+0084+  84A4             ;	LD	HL,ADDR+#76
+0085+  84A4             ;	LD	DE,#4000
+0086+  84A4 08          	EX	AF,AF'
+0087+  84A5 47          	LD	B,A
+0088+  84A6 DB A2       	IN	A,(EmmWin.P1)
+0089+  84A8 F5          	PUSH	AF
+0090+  84A9 3E 50       	LD	A,#50
+0091+  84AB D3 A2       	OUT	(EmmWin.P1),A
+0092+  84AD DB C9       	in a,(RGMOD)
+0093+  84AF E6 01       	and 1
+0094+  84B1 20 08       	jr nz,.firstpg
+0095+  84B3 EB          	ex de,hl
+0096+  84B4 D5          	push de
+0097+  84B5 11 40 01    	ld de,#0140
+0098+  84B8 19          	add hl,de
+0099+  84B9 D1          	pop de
+0100+  84BA EB          	ex de,hl
+0101+  84BB             .firstpg: 
+0102+  84BB 08          	EX	AF,AF'
+0103+  84BC             ;	LD	A,0
+0104+  84BC             ;	LD	B,100
+0105+  84BC C5          .loop	PUSH	BC
+0106+  84BD D5          	PUSH	DE
+0107+  84BE D3 89       	OUT	(#89),A
+0108+  84C0 01 00 00    	LD	BC,0
+0109+  84C3             .len: 	EQU	$-2
+0110+  84C3 ED B0       	LDIR
+0111+  84C5 D1          	POP	DE
+0112+  84C6 C1          	POP	BC
+0113+  84C7 3C          	INC	A
+0114+  84C8 10 F2       	DJNZ	.loop
+0115+  84CA F1          	POP	AF
+0116+  84CB D3 A2       	OUT	(EmmWin.P1),A
+0117+  84CD C9          	RET
+0118+  84CE             ;BC - высота/ширина
+0119+  84CE             ;HL - откуда
+0120+  84CE             ;DE - куда
+0121+  84CE             ;A - Y координата
+0122+  84CE             ShowBitmapAcc: 
+0123+  84CE             ;	LD	HL,ADDR+#76
+0124+  84CE             ;	LD	DE,#4000
+0125+  84CE 08          	ex af,af'
+0126+  84CF 79          	ld a,c
+0127+  84D0 32 F0 84    	ld (.len),a
+0128+  84D3 DB A2       	IN A,(EmmWin.P1)
+0129+  84D5 F5          	push af
+0130+  84D6 3E 50       	LD A,#50
+0131+  84D8 D3 A2       	OUT (EmmWin.P1),A
+0132+  84DA DB C9       	in a,(RGMOD)
+0133+  84DC E6 01       	and 1
+0134+  84DE 20 08       	jr nz,.firstpg
+0135+  84E0 EB          	ex de,hl
+0136+  84E1 D5          	push de
+0137+  84E2 11 40 01    	ld de,#0140
+0138+  84E5 19          	add hl,de
+0139+  84E6 D1          	pop de
+0140+  84E7 EB          	ex de,hl
+0141+  84E8             .firstpg: 
+0142+  84E8 08          	ex af,af'
+0143+  84E9             ;	LD	A,0
+0144+  84E9             ;	LD	B,100
+0145+  84E9 C5          .loop: 	PUSH BC
+0146+  84EA F5          	push af
+0147+  84EB D3 89       	OUT (#89),A
+0148+  84ED F3          	di
+0149+  84EE 52          	ld d,d		;enable accel, set buffer size
+0150+  84EF 3E 00       	ld a,0
+0151+  84F1             .len: 	equ $-1
+0152+  84F1 6D          	ld l,l
+0153+  84F2 7E          	ld a,(hl)
+0154+  84F3 12          	ld (de),a
+0155+  84F4 40          	ld b,b
+0156+  84F5 FB          	ei
+0157+  84F6 06 00       	ld b,0
+0158+  84F8 09          	add hl,bc
+0159+  84F9 F1          	pop af
+0160+  84FA C1          	POP BC
+0161+  84FB 3C          	INC A
+0162+  84FC 10 EB       	DJNZ .loop
+0163+  84FE F1          	pop af
+0164+  84FF D3 A2       	OUT (EmmWin.P1),A
+0165+  8501 C9          	RET
+0166+  8502             
+0167+  8502             ;BC - высота/ширина
+0168+  8502             ;HL - откуда
+0169+  8502             ;DE - куда
+0170+  8502             ;A - Y координата
+0171+  8502             ShowMaskBitmapShadowAcc: 
+0172+  8502             ;	LD	HL,ADDR+#76
+0173+  8502             ;	LD	DE,#4000
+0174+  8502 08          	ex af,af'
+0175+  8503 79          	ld a,c
+0176+  8504 32 24 85    	ld (.len),a
+0177+  8507 DB A2       	IN A,(EmmWin.P1)
+0178+  8509 F5          	push af
+0179+  850A 3E 5C       	LD A,#5C
+0180+  850C D3 A2       	OUT (EmmWin.P1),A
+0181+  850E DB C9       	in a,(RGMOD)
+0182+  8510 E6 01       	and 1
+0183+  8512 20 08       	jr nz,.firstpg
+0184+  8514 EB          	ex de,hl
+0185+  8515 D5          	push de
+0186+  8516 11 40 01    	ld de,#0140
+0187+  8519 19          	add hl,de
+0188+  851A D1          	pop de
+0189+  851B EB          	ex de,hl
+0190+  851C             .firstpg: 
+0191+  851C 08          	ex af,af'
+0192+  851D             ;	LD	A,0
+0193+  851D             ;	LD	B,100
+0194+  851D C5          .loop	PUSH BC
+0195+  851E F5          	push af
+0196+  851F D3 89       	OUT (#89),A
+0197+  8521 F3          	di
+0198+  8522 52          	ld d,d		;enable accel, set buffer size
+0199+  8523 3E 00       	ld a,0
+0200+  8525             .len: 	equ $-1
+0201+  8525 6D          	ld l,l
+0202+  8526 7E          	ld a,(hl)
+0203+  8527 12          	ld (de),a
+0204+  8528 40          	ld b,b
+0205+  8529 FB          	ei
+0206+  852A 06 00       	ld b,0
+0207+  852C 09          	add hl,bc
+0208+  852D F1          	pop af
+0209+  852E C1          	POP BC
+0210+  852F 3C          	INC A
+0211+  8530 10 EB       	DJNZ .loop
+0212+  8532 F1          	pop af
+0213+  8533 D3 A2       	OUT (EmmWin.P1),A
+0214+  8535 C9          	RET
+0215+  8536             
+0216+  8536             ;HL - Palette
+0217+  8536             ;D - Colors count
+0218+  8536             ;E - Start color number
+0219+  8536             ;A - Palette number
+0220+  8536             SetPalette: 
+0221+  8536 F3          	di
+0222+  8537 E5          	push	hl
+0223+  8538 D5          	push	de
+0224+  8539 C5          	push	bc	
+0225+  853A 06 FF       	LD	B,0xff
+0226+  853C 0E A4       	LD	C,Bios.SetPalette
+0227+  853E CF          	RST	0x08
+0228+  853F C1          	pop	bc
+0229+  8540 D1          	pop	de
+0230+  8541 E1          	pop	hl
+0231+  8542 FB          	ei
+0232+  8543 C9          	RET
+0233+  8544             
+0234+  8544             ;Копирует весь основ экран в теневой
+0235+  8544             CopyBackground: 	
+0236+  8544 F3                  di
+0237+  8545 DB E2               IN A,(EmmWin.P3)
+0238+  8547 F5          	PUSH AF
+0239+  8548 3E 50       	LD A,#50
+0240+  854A D3 E2       	OUT (EmmWin.P3),A
+0241+  854C 21 00 C0    	ld hl,#c000
+0242+  854F 11 40 C1            ld de,#c140
+0243+  8552 01 40 01            ld bc,#140
+0244+  8555 52                  ld d,d
+0245+  8556 3E 00               ld a,0
+0246+  8558 7F          .loop:   ld a,a
+0247+  8559 7E                  ld a,(hl)
+0248+  855A 12          	ld (de),a
+0249+  855B 40                  ld b,b
+0250+  855C 23          	inc hl
+0251+  855D 13          	inc de
+0252+  855E 0B          	dec bc
+0253+  855F 78          	ld a,b
+0254+  8560 B1          	or c
+0255+  8561 20 F5       	jr nz,.loop
+0256+  8563 F1          	pop af
+0257+  8564 D3 E2       	OUT (EmmWin.P3),A
+0258+  8566 FB                  ei
+0259+  8567 C9                  ret
+0260+  8568             ;Восстанавливает из основного ОЗУ в Видео ОЗУ прямоугольник (при использовании режима записи только в VRAM bit 2)
+0261+  8568             ;HL - Addr
+0262+  8568             ;B - Len
+0263+  8568             ;C - Height
+0264+  8568             ;A - Y
+0265+  8568             RestoreRect: 
+0266+  8568 08          	ex af,af'
+0267+  8569 DB E2       	IN A,(EmmWin.P3)
+0268+  856B F5          	push af
+0269+  856C 3E 50       	LD A,#50
+0270+  856E D3 E2       	OUT (EmmWin.P3),A
+0271+  8570 DB C9       	in a,(RGMOD)
+0272+  8572 E6 01       	and 1
+0273+  8574 20 04       	jr nz,.firstpg
+0274+  8576 11 40 01    	ld de,#0140
+0275+  8579 19          	add hl,de
+0276+  857A             .firstpg: 
+0277+  857A 79          	ld a,c
+0278+  857B 32 85 85    	ld (.hgt),a
+0279+  857E F3          	di
+0280+  857F 08          	ex af,af'
+0281+  8580             .loop: 	
+0282+  8580 D3 89       	out (Y_PORT),a
+0283+  8582 3C          	inc a
+0284+  8583 52          	ld d,d
+0285+  8584 0E 00       	ld c,0
+0286+  8586             .hgt: 	equ $-1
+0287+  8586 6D          	ld l,l
+0288+  8587 4E          	ld c,(hl)
+0289+  8588 71          	ld (hl),c
+0290+  8589 40          	ld b,b
+0291+  858A 10 F4       	djnz .loop
+0292+  858C F1          	pop af
+0293+  858D D3 E2       	out (EmmWin.P3),a
+0294+  858F FB          	ei
+0295+  8590 C9          	ret	
+0296+  8591             
+0297+  8591             
+0298+  8591             ;Восстанавливает из теневого экрана прямоугольник
+0299+  8591             ;HL - Addr
+0300+  8591             ;B - Len
+0301+  8591             ;C - Height
+0302+  8591             ;A - Y
+0303+  8591             RestoreBackground: 
+0304+  8591 08          	ex af,af'
+0305+  8592 DB E2       	IN A,(EmmWin.P3)
+0306+  8594 F5          	push af
+0307+  8595 3E 50       	LD A,#50
+0308+  8597 D3 E2       	OUT (EmmWin.P3),A
+0309+  8599 79          	ld a,c
+0310+  859A 32 AA 85    	ld (.hgt),a	
+0311+  859D E5          	push hl
+0312+  859E 11 40 01    	ld de,#140
+0313+  85A1 19          	add hl,de
+0314+  85A2 D1          	pop de
+0315+  85A3 F3          	di
+0316+  85A4 08          .loop: 	ex af,af'
+0317+  85A5 D3 89       	out (Y_PORT),a
+0318+  85A7 08          	ex af,af'
+0319+  85A8 52          	ld d,d
+0320+  85A9 3E 00       	ld a,0
+0321+  85AB             .hgt: 	equ $-1
+0322+  85AB 7F          	ld a,a
+0323+  85AC 7E          	ld a,(hl)
+0324+  85AD 12          	ld (de),a
+0325+  85AE 40          	ld b,b
+0326+  85AF 23          	inc hl
+0327+  85B0 13          	inc de
+0328+  85B1 10 F1       	djnz .loop
+0329+  85B3 F1          	pop af
+0330+  85B4 D3 E2       	out (EmmWin.P3),a
+0331+  85B6 FB          	ei
+0332+  85B7 C9          	ret
+0333+  85B8             
+0334+  85B8             ;HL - buffer
+0335+  85B8             ResetPallete: 
+0336+  85B8 E5          	push hl
+0337+  85B9 AF          	xor a
+0338+  85BA 06 FF       	ld b,255
+0339+  85BC 0E 04       .cls1: 	ld c,4
+0340+  85BE 77          .cls: 	ld (hl),a
+0341+  85BF 23          	inc hl
+0342+  85C0 0D          	dec c
+0343+  85C1 20 FB       	jr nz,.cls
+0344+  85C3 10 F7       	djnz .cls1
+0345+  85C5 E1          	pop hl
+0346+  85C6 11 00 FF    	ld de,#ff00
+0347+  85C9 AF          	xor a
+0348+  85CA CD 36 85    	call SetPalette
+0349+  85CD C9          	ret
+0350+  85CE             
+0351+  85CE             ;HL - current pallette
+0352+  85CE             ;DE - buffer
+0353+  85CE             ;B - Colors count
+0354+  85CE             ;C - Start color number
+0355+  85CE             UnfadePallete: 
+0356+  85CE FB          	ei
+0357+  85CF E5          	push hl
+0358+  85D0 D5          	push de
+0359+  85D1 C5          	push bc
+0360+  85D2 AF          	xor a
+0361+  85D3 0E 04       .cls1: 	ld c,4
+0362+  85D5 12          .cls: 	ld (de),a
+0363+  85D6 13          	inc de
+0364+  85D7 0D          	dec c
+0365+  85D8 20 FB       	jr nz,.cls
+0366+  85DA 10 F7       	djnz .cls1
+0367+  85DC D1          	pop de
+0368+  85DD E1          	pop hl
+0369+  85DE D5          	push de
+0370+  85DF AF          	xor a
+0371+  85E0 CD 36 85    	call SetPalette
+0372+  85E3 76          	halt
+0373+  85E4 C1          	pop bc
+0374+  85E5 EB          	ex de,hl
+0375+  85E6 E1          	pop hl
+0376+  85E7 3E 40       	ld a,64	
+0377+  85E9             .unfadeloop: 
+0378+  85E9 F5          	push af
+0379+  85EA E5          	push hl
+0380+  85EB D5          	push de
+0381+  85EC C5          	push bc
+0382+  85ED C5          	push bc
+0383+  85EE D5          	push de
+0384+  85EF 0E 03       .loop1: 	ld c,3
+0385+  85F1 1A          .loop: 	ld a,(de)
+0386+  85F2 C6 04       	add 4
+0387+  85F4 BE          	cp (hl)
+0388+  85F5 38 01       	jr c,.next
+0389+  85F7 7E          	ld a,(hl)
+0390+  85F8 12          .next: 	ld (de),a
+0391+  85F9 23          	inc hl
+0392+  85FA 13          	inc de
+0393+  85FB 0D          	dec c
+0394+  85FC 20 F3       	jr nz,.loop
+0395+  85FE 23          	inc hl
+0396+  85FF 13          	inc de
+0397+  8600 10 ED       	djnz .loop1
+0398+  8602 E1          	pop hl
+0399+  8603 D1          	pop de
+0400+  8604 76          	halt
+0401+  8605 AF          	xor a
+0402+  8606 CD 36 85    	call SetPalette
+0403+  8609 C1          	pop bc
+0404+  860A D1          	pop de
+0405+  860B E1          	pop hl
+0406+  860C F1          	pop af
+0407+  860D 3D          	dec a
+0408+  860E 20 D9       	jr nz,.unfadeloop
+0409+  8610 C5          	push bc
+0410+  8611 D1          	pop de
+0411+  8612 AF          	xor a
+0412+  8613 CD 36 85    	call SetPalette
+0413+  8616 C9          	ret
+0414+  8617             
+0415+  8617             ;HL - temp buffer with current pallette
+0416+  8617             ;D - Colors count
+0417+  8617             ;E - Start color number
+0418+  8617             FadePallete: 
+0419+  8617 FB          	ei
+0420+  8618 3E 40       	ld a,64
+0421+  861A             .fadeloop: 
+0422+  861A F5          	push af
+0423+  861B E5          	push hl
+0424+  861C 42          	ld b,d
+0425+  861D 0E 03       .loop1: 	ld c,3
+0426+  861F 7E          .loop: 	ld a,(hl)
+0427+  8620 D6 04       	sub 4
+0428+  8622 30 01       	jr nc,.next
+0429+  8624 AF          	xor a
+0430+  8625 77          .next: 	ld (hl),a
+0431+  8626 23          	inc hl
+0432+  8627 0D          	dec c
+0433+  8628 20 F5       	jr nz,.loop
+0434+  862A 23          	inc hl
+0435+  862B 10 F0       	djnz .loop1
+0436+  862D E1          	pop hl
+0437+  862E 76          	halt
+0438+  862F 97                  sub a
+0439+  8630 CD 36 85    	call SetPalette
+0440+  8633 F1          	pop af
+0441+  8634 3D          	dec a
+0442+  8635 20 E3       	jr nz,.fadeloop
+0443+  8637 C9          	ret
+0444+  8638             
+0445+  8638             ADDR: 	EQU	#C000
+0446+  8638             OldVideoMode: 
+0447+  8638 00          	DB	0
+0448+  8639             OldVideoPage: 
+0449+  8639 00          	DB	0
+0490   863A                             include "sys_utils.asm"
+0001+  863A             WaitSpaceKey: 
+0002+  863A             .loop
+0003+  863A 0E 31       	ld	c,Dss.ScanKey
+0004+  863C D7          	rst	#10
+0005+  863D 28 FB       	jr	z,.loop
+0006+  863F FE 20       	cp	#20
+0007+  8641 C8          	ret	z
+0008+  8642 FE 1B       	cp	#1B
+0009+  8644 20 F4       	jr	nz,.loop
+0010+  8646 37          	scf
+0011+  8647 C9                  ret
+0012+  8648             
+0013+  8648             CheckKeys: 
+0014+  8648 0E 31       	ld	c,Dss.ScanKey
+0015+  864A D7          	rst	#10
+0016+  864B C8          	ret	z
+0017+  864C FE 1B       	cp	#1B
+0018+  864E C0          	ret	nz
+0019+  864F 37          	scf
+0020+  8650 C9                  ret
+0021+  8651             
+0022+  8651             ; процедура сохранения страницы в указнном окне.
+0023+  8651             ; C = окно (порт)
+0024+  8651             ; HL = куда сохранять.
+0025+  8651 ED 78       SavePage: 	in a,(c)
+0026+  8653 77          		ld (hl),a
+0027+  8654 C9          		ret
+0028+  8655             
+0029+  8655             ; процедура восстановления страницы в указнном окне.
+0030+  8655             ; C = окно (порт)
+0031+  8655             ; HL = от куда восстановить.
+0032+  8655 7E          RestorePage: 	ld a,(hl)
+0033+  8656 ED 79       		out (c),a
+0034+  8658 C9          		ret
+0491   8659                             include "im2_utils.asm"
+0001+  8659             ;Установка IM2 и нового вектора прерываний
+0002+  8659             ;DE - обработчик прерываний
+0003+  8659             set_im2: 
+0004+  8659                     ;устанавливаем адрес процедуры перехватчик прерываний
+0005+  8659             	; LD	de,im2_handler
+0006+  8659 21 FF 80    	LD	hl,#80FF
+0007+  865C 73          	LD	(hl),e
+0008+  865D 23          	INC	hl
+0009+  865E 72          	LD	(hl),d
+0010+  865F             
+0011+  865F             	;запуск режима IM2
+0012+  865F ED 57       	LD	a,i           	;сохранение
+0013+  8661 32 6F 86    	LD	(set_im1.save_i),a  ;     регистра прерываний
+0014+  8664 3E 80       	LD	a,#80
+0015+  8666 F3          	DI
+0016+  8667 ED 47       	LD	i,a		;i=#80
+0017+  8669 ED 5E       	IM	2
+0018+  866B FB          	EI
+0019+  866C C9                  ret
+0020+  866D             ;Восстановление режима IM1 и предыдущего значения вектора прерываний
+0021+  866D             set_im1: 
+0022+  866D F3                  di
+0023+  866E 3E 00               ld      a,0
+0024+  8670             .save_i:  equ    $-1
+0025+  8670 ED 47               ld      i,a
+0026+  8672 ED 56               im      1
+0027+  8674 FB                  ei
+0028+  8675 C9                  ret
+0029+  8676             
+0030+  8676             
+0492   8676                             
+0493   8676             Palette: 
+0494   8676                             include "res_pal.asm"
+0001+  8676                     ;Palette of 146 colors
+0002+  8676 92                  db  146
+0003+  8677 C9 C0 54 00         db  0xC9, 0xC0, 0x54, 0x00
+0004+  867B 75 E0 64 00         db  0x75, 0xE0, 0x64, 0x00
+0005+  867F 98 D7 DE 00         db  0x98, 0xD7, 0xDE, 0x00
+0006+  8683 DA FB E9 00         db  0xDA, 0xFB, 0xE9, 0x00
+0007+  8687 CA C2 56 00         db  0xCA, 0xC2, 0x56, 0x00
+0008+  868B DA FA E6 00         db  0xDA, 0xFA, 0xE6, 0x00
+0009+  868F D9 F9 E3 00         db  0xD9, 0xF9, 0xE3, 0x00
+0010+  8693 CC CB 73 00         db  0xCC, 0xCB, 0x73, 0x00
+0011+  8697 D9 FB E8 00         db  0xD9, 0xFB, 0xE8, 0x00
+0012+  869B C8 E8 BF 00         db  0xC8, 0xE8, 0xBF, 0x00
+0013+  869F C8 E6 BB 00         db  0xC8, 0xE6, 0xBB, 0x00
+0014+  86A3 D6 DC A3 00         db  0xD6, 0xDC, 0xA3, 0x00
+0015+  86A7 D8 DC A5 00         db  0xD8, 0xDC, 0xA5, 0x00
+0016+  86AB D8 DE A8 00         db  0xD8, 0xDE, 0xA8, 0x00
+0017+  86AF C9 ED CF 00         db  0xC9, 0xED, 0xCF, 0x00
+0018+  86B3 D5 DB A1 00         db  0xD5, 0xDB, 0xA1, 0x00
+0019+  86B7 C8 ED D1 00         db  0xC8, 0xED, 0xD1, 0x00
+0020+  86BB D1 F0 E2 00         db  0xD1, 0xF0, 0xE2, 0x00
+0021+  86BF D0 EF E0 00         db  0xD0, 0xEF, 0xE0, 0x00
+0022+  86C3 D8 DC A2 00         db  0xD8, 0xDC, 0xA2, 0x00
+0023+  86C7 D5 DA 9D 00         db  0xD5, 0xDA, 0x9D, 0x00
+0024+  86CB D3 DB A0 00         db  0xD3, 0xDB, 0xA0, 0x00
+0025+  86CF C5 E4 B6 00         db  0xC5, 0xE4, 0xB6, 0x00
+0026+  86D3 D1 EF DE 00         db  0xD1, 0xEF, 0xDE, 0x00
+0027+  86D7 C8 EE D4 00         db  0xC8, 0xEE, 0xD4, 0x00
+0028+  86DB D0 ED DA 00         db  0xD0, 0xED, 0xDA, 0x00
+0029+  86DF D7 DC A5 00         db  0xD7, 0xDC, 0xA5, 0x00
+0030+  86E3 C5 E6 BA 00         db  0xC5, 0xE6, 0xBA, 0x00
+0031+  86E7 C3 E6 BC 00         db  0xC3, 0xE6, 0xBC, 0x00
+0032+  86EB D8 DB 9E 00         db  0xD8, 0xDB, 0x9E, 0x00
+0033+  86EF C8 E4 B1 00         db  0xC8, 0xE4, 0xB1, 0x00
+0034+  86F3 CC EB CC 00         db  0xCC, 0xEB, 0xCC, 0x00
+0035+  86F7 C8 E4 B6 00         db  0xC8, 0xE4, 0xB6, 0x00
+0036+  86FB D3 DA 9C 00         db  0xD3, 0xDA, 0x9C, 0x00
+0037+  86FF D1 EC D7 00         db  0xD1, 0xEC, 0xD7, 0x00
+0038+  8703 C9 EB CE 00         db  0xC9, 0xEB, 0xCE, 0x00
+0039+  8707 C5 EE D4 00         db  0xC5, 0xEE, 0xD4, 0x00
+0040+  870B D6 D9 9A 00         db  0xD6, 0xD9, 0x9A, 0x00
+0041+  870F C5 E4 B2 00         db  0xC5, 0xE4, 0xB2, 0x00
+0042+  8713 C2 E5 BA 00         db  0xC2, 0xE5, 0xBA, 0x00
+0043+  8717 C8 EF D8 00         db  0xC8, 0xEF, 0xD8, 0x00
+0044+  871B C5 E3 B1 00         db  0xC5, 0xE3, 0xB1, 0x00
+0045+  871F D0 EB D0 00         db  0xD0, 0xEB, 0xD0, 0x00
+0046+  8723 C8 ED D4 00         db  0xC8, 0xED, 0xD4, 0x00
+0047+  8727 CE EF DD 00         db  0xCE, 0xEF, 0xDD, 0x00
+0048+  872B C2 E4 B6 00         db  0xC2, 0xE4, 0xB6, 0x00
+0049+  872F C5 EC CF 00         db  0xC5, 0xEC, 0xCF, 0x00
+0050+  8733 C2 E3 B1 00         db  0xC2, 0xE3, 0xB1, 0x00
+0051+  8737 CF D9 9A 00         db  0xCF, 0xD9, 0x9A, 0x00
+0052+  873B C5 EB CD 00         db  0xC5, 0xEB, 0xCD, 0x00
+0053+  873F CE EC DA 00         db  0xCE, 0xEC, 0xDA, 0x00
+0054+  8743 C4 ED D1 00         db  0xC4, 0xED, 0xD1, 0x00
+0055+  8747 D1 D9 9B 00         db  0xD1, 0xD9, 0x9B, 0x00
+0056+  874B CD EB D6 00         db  0xCD, 0xEB, 0xD6, 0x00
+0057+  874F CB EB D8 00         db  0xCB, 0xEB, 0xD8, 0x00
+0058+  8753 C7 EB D4 00         db  0xC7, 0xEB, 0xD4, 0x00
+0059+  8757 BF E4 B3 00         db  0xBF, 0xE4, 0xB3, 0x00
+0060+  875B BE EB C9 00         db  0xBE, 0xEB, 0xC9, 0x00
+0061+  875F BB E2 AC 00         db  0xBB, 0xE2, 0xAC, 0x00
+0062+  8763 CC D8 93 00         db  0xCC, 0xD8, 0x93, 0x00
+0063+  8767 C2 EA C8 00         db  0xC2, 0xEA, 0xC8, 0x00
+0064+  876B C3 EC CB 00         db  0xC3, 0xEC, 0xCB, 0x00
+0065+  876F CD D8 96 00         db  0xCD, 0xD8, 0x96, 0x00
+0066+  8773 BF EB CD 00         db  0xBF, 0xEB, 0xCD, 0x00
+0067+  8777 C2 EC D0 00         db  0xC2, 0xEC, 0xD0, 0x00
+0068+  877B CF EF E0 00         db  0xCF, 0xEF, 0xE0, 0x00
+0069+  877F CA EB D5 00         db  0xCA, 0xEB, 0xD5, 0x00
+0070+  8783 BF EC CD 00         db  0xBF, 0xEC, 0xCD, 0x00
+0071+  8787 C2 EC CE 00         db  0xC2, 0xEC, 0xCE, 0x00
+0072+  878B BD E3 B0 00         db  0xBD, 0xE3, 0xB0, 0x00
+0073+  878F C3 EA CE 00         db  0xC3, 0xEA, 0xCE, 0x00
+0074+  8793 84 CD 74 00         db  0x84, 0xCD, 0x74, 0x00
+0075+  8797 81 CC 6F 00         db  0x81, 0xCC, 0x6F, 0x00
+0076+  879B D2 D7 99 00         db  0xD2, 0xD7, 0x99, 0x00
+0077+  879F C2 EA C6 00         db  0xC2, 0xEA, 0xC6, 0x00
+0078+  87A3 BC EA C5 00         db  0xBC, 0xEA, 0xC5, 0x00
+0079+  87A7 81 CC 6A 00         db  0x81, 0xCC, 0x6A, 0x00
+0080+  87AB 80 CB 65 00         db  0x80, 0xCB, 0x65, 0x00
+0081+  87AF 81 C9 61 00         db  0x81, 0xC9, 0x61, 0x00
+0082+  87B3 84 CB 69 00         db  0x84, 0xCB, 0x69, 0x00
+0083+  87B7 C7 D7 90 00         db  0xC7, 0xD7, 0x90, 0x00
+0084+  87BB CF DA 9C 00         db  0xCF, 0xDA, 0x9C, 0x00
+0085+  87BF 81 CB 69 00         db  0x81, 0xCB, 0x69, 0x00
+0086+  87C3 84 CB 6D 00         db  0x84, 0xCB, 0x6D, 0x00
+0087+  87C7 BA E2 AA 00         db  0xBA, 0xE2, 0xAA, 0x00
+0088+  87CB CA D8 91 00         db  0xCA, 0xD8, 0x91, 0x00
+0089+  87CF BC E9 C1 00         db  0xBC, 0xE9, 0xC1, 0x00
+0090+  87D3 BA E3 B0 00         db  0xBA, 0xE3, 0xB0, 0x00
+0091+  87D7 C2 E4 B3 00         db  0xC2, 0xE4, 0xB3, 0x00
+0092+  87DB B7 E2 AA 00         db  0xB7, 0xE2, 0xAA, 0x00
+0093+  87DF BE E4 B6 00         db  0xBE, 0xE4, 0xB6, 0x00
+0094+  87E3 CA D7 8E 00         db  0xCA, 0xD7, 0x8E, 0x00
+0095+  87E7 D3 D7 97 00         db  0xD3, 0xD7, 0x97, 0x00
+0096+  87EB C9 D8 8F 00         db  0xC9, 0xD8, 0x8F, 0x00
+0097+  87EF 7D CB 65 00         db  0x7D, 0xCB, 0x65, 0x00
+0098+  87F3 7D DF 6D 00         db  0x7D, 0xDF, 0x6D, 0x00
+0099+  87F7 7B DF 6C 00         db  0x7B, 0xDF, 0x6C, 0x00
+0100+  87FB 84 C9 67 00         db  0x84, 0xC9, 0x67, 0x00
+0101+  87FF CD D7 91 00         db  0xCD, 0xD7, 0x91, 0x00
+0102+  8803 CC D7 8F 00         db  0xCC, 0xD7, 0x8F, 0x00
+0103+  8807 C9 D5 8B 00         db  0xC9, 0xD5, 0x8B, 0x00
+0104+  880B 7D CA 61 00         db  0x7D, 0xCA, 0x61, 0x00
+0105+  880F 7C DD 6A 00         db  0x7C, 0xDD, 0x6A, 0x00
+0106+  8813 7A DD 69 00         db  0x7A, 0xDD, 0x69, 0x00
+0107+  8817 79 DD 65 00         db  0x79, 0xDD, 0x65, 0x00
+0108+  881B BA E9 C2 00         db  0xBA, 0xE9, 0xC2, 0x00
+0109+  881F 84 CB 71 00         db  0x84, 0xCB, 0x71, 0x00
+0110+  8823 7E CC 68 00         db  0x7E, 0xCC, 0x68, 0x00
+0111+  8827 7A CB 61 00         db  0x7A, 0xCB, 0x61, 0x00
+0112+  882B 7E C8 5F 00         db  0x7E, 0xC8, 0x5F, 0x00
+0113+  882F 7B C9 5E 00         db  0x7B, 0xC9, 0x5E, 0x00
+0114+  8833 BC E2 AD 00         db  0xBC, 0xE2, 0xAD, 0x00
+0115+  8837 C7 D7 8E 00         db  0xC7, 0xD7, 0x8E, 0x00
+0116+  883B B8 EA C4 00         db  0xB8, 0xEA, 0xC4, 0x00
+0117+  883F 76 DE 64 00         db  0x76, 0xDE, 0x64, 0x00
+0118+  8843 75 E0 63 00         db  0x75, 0xE0, 0x63, 0x00
+0119+  8847 7C DC 66 00         db  0x7C, 0xDC, 0x66, 0x00
+0120+  884B 7E C7 5D 00         db  0x7E, 0xC7, 0x5D, 0x00
+0121+  884F 7C C9 5A 00         db  0x7C, 0xC9, 0x5A, 0x00
+0122+  8853 78 C9 59 00         db  0x78, 0xC9, 0x59, 0x00
+0123+  8857 78 DB 63 00         db  0x78, 0xDB, 0x63, 0x00
+0124+  885B 75 DE 63 00         db  0x75, 0xDE, 0x63, 0x00
+0125+  885F 74 DF 61 00         db  0x74, 0xDF, 0x61, 0x00
+0126+  8863 74 DE 5F 00         db  0x74, 0xDE, 0x5F, 0x00
+0127+  8867 84 CC 72 00         db  0x84, 0xCC, 0x72, 0x00
+0128+  886B 7B CA 65 00         db  0x7B, 0xCA, 0x65, 0x00
+0129+  886F 77 CA 5F 00         db  0x77, 0xCA, 0x5F, 0x00
+0130+  8873 75 C9 59 00         db  0x75, 0xC9, 0x59, 0x00
+0131+  8877 72 C9 58 00         db  0x72, 0xC9, 0x58, 0x00
+0132+  887B B6 E2 A7 00         db  0xB6, 0xE2, 0xA7, 0x00
+0133+  887F B6 EA C0 00         db  0xB6, 0xEA, 0xC0, 0x00
+0134+  8883 74 DC 5E 00         db  0x74, 0xDC, 0x5E, 0x00
+0135+  8887 73 C7 58 00         db  0x73, 0xC7, 0x58, 0x00
+0136+  888B 76 C7 5A 00         db  0x76, 0xC7, 0x5A, 0x00
+0137+  888F 70 C9 57 00         db  0x70, 0xC9, 0x57, 0x00
+0138+  8893 6F C9 57 00         db  0x6F, 0xC9, 0x57, 0x00
+0139+  8897 72 DC 5E 00         db  0x72, 0xDC, 0x5E, 0x00
+0140+  889B 6F CA 57 00         db  0x6F, 0xCA, 0x57, 0x00
+0141+  889F 72 DB 5E 00         db  0x72, 0xDB, 0x5E, 0x00
+0142+  88A3 6F CB 58 00         db  0x6F, 0xCB, 0x58, 0x00
+0143+  88A7 47 38 54 00         db  0x47, 0x38, 0x54, 0x00
+0144+  88AB 91 FA E4 00         db  0x91, 0xFA, 0xE4, 0x00
+0145+  88AF 3A BD 75 00         db  0x3A, 0xBD, 0x75, 0x00
+0146+  88B3 61 E4 9E 00         db  0x61, 0xE4, 0x9E, 0x00
+0147+  88B7 29 7E 56 00         db  0x29, 0x7E, 0x56, 0x00
+0148+  88BB 54 A7 D6 00         db  0x54, 0xA7, 0xD6, 0x00
+0149+  88BF             
+0495   88BF             PaletteEnd: 
+0496   88BF                             
+0497   88BF             
+0498   88BF             AppDir: 	        equ ($/80h)*80h+80h
+0499   88BF             AssetsDir: 	equ AppDir + 128
+0500   88BF             code_end: 
+0501   88BF             
+0502   88BF                             org 0xC000
+0503   C000             PlayerStart: 
+0504   C000                             include "pt3play.asm"
 0001+  C000             	module pt3player
 0002+  C000             	
 0003+  C000             ;Vortex Tracker II v1.0 PT3 player for ZX Spectrum
@@ -2493,8 +2581,8 @@
 1189+  C86E             ;tables really used only for modules of 3.3 and older versions.
 1190+  C86E             
 1191+  C86E             	endmodule
-0417   C86E             MusicModule: 
-0418   C86E                             incbin "music\mus1.pt3"
-0419   F1D8             PlayerEnd: 
-0420   F1D8                             savebin "assets\music.bin",PlayerStart,PlayerEnd-PlayerStart
-0421   F1D8                             savebin "FBIRD.EXE",start_addr,code_end-start_addr
+0505   C86E             MusicModule: 
+0506   C86E                             incbin "music\mus1.pt3"
+0507   F1D8             PlayerEnd: 
+0508   F1D8                             savebin "assets\music.bin",PlayerStart,PlayerEnd-PlayerStart
+0509   F1D8                             savebin "FBIRD.EXE",start_addr,code_end-start_addr

@@ -85,11 +85,13 @@ main:	        di
                 ; ld c,0
                 ; call UnfadePallete
                 call FillScreen
+                call DrawCity
                 ld a,1
                 ld (Im2Handler.needChangePage),a        ;Переключаем основной экран на 1
                 ei
                 halt
                 call FillScreen
+                call DrawCity
                 in a,(RGMOD)
                 and a
                 ld a,1
@@ -171,20 +173,37 @@ FillScreen:     in a,(EmmWin.P3)
                 and 1
                 jr z,.firstScreen
                 ld hl,#c140
-.firstScreen:   di
+.firstScreen:   
+                ld b,150
                 xor a
-                out (Y_PORT),a
-                ld d,d
-                ld a,100        ;sky height
-                ld e,e
+.loop1:         out (Y_PORT),a
                 ld (hl),0
-                ld b,b
-                out (Y_PORT),a
-                ld d,d
-                ld a,100        ;grass height
-                ld e,e
+                inc a
+                djnz .loop1
+                ld b,70
+.loop2:         out (Y_PORT),a
                 ld (hl),1
-                ld b,b
+                inc a
+                djnz .loop2
+                ld b,36
+.loop3:         out (Y_PORT),a
+                ld (hl),2
+                inc a
+                djnz .loop3
+;TODO: check on real this example                
+                ; ld d,d
+                ; ld a,100        ;sky height
+                ; ld e,e
+                ; ld (hl),0
+                ; ld b,b
+                ; ld a,99
+                ; out (Y_PORT),a
+                ; ld d,d
+                ; ld a,100        ;grass height
+                ; ld e,e
+                ; ld (hl),1
+                ; ld b,b
+
                 ; ld a,199        ;grass Y pos
                 ; out (Y_PORT),a
                 ; ld d,d
@@ -192,6 +211,7 @@ FillScreen:     in a,(EmmWin.P3)
                 ; ld e,e
                 ; ld (hl),2
                 ; ld b,b
+                di
                 xor a
                 out (Y_PORT),a
                 ld d,h
@@ -207,6 +227,74 @@ FillScreen:     in a,(EmmWin.P3)
                 out (EmmWin.P3),a
                 ret
 
+DrawCity:       
+                IN A,(EmmWin.P1)
+                push af
+                IN A,(EmmWin.P3)
+                push af
+                LD A,#50
+                OUT (EmmWin.P1),A
+                ld a,(MemoryBuffer.memCity)
+                out (EmmWin.P3),a
+                ld hl,#4000
+                in a,(RGMOD)
+                and 1
+                jr nz,.firstpg
+                ld hl,#4140
+                ld de,138
+                ld (.adr1),hl
+                add hl,de
+                ld (.adr2),hl
+                add hl,de
+                ld (.adr3),hl
+.firstpg:       ld hl,#c000     ;city sprite
+                ld a,0
+.pos:           equ $-1
+                ld c,a
+                ld b,0
+                add hl,bc
+                ld b,39         ;city hgt
+                ld a,150        ;city Y pos
+.loop:	        PUSH BC
+                push af
+                OUT (#89),A
+                di
+                ld de,0
+.adr1:          equ $-2                
+                ld d,d		;enable accel, set buffer size
+                ld a,138        ;pattern lenght
+                ld l,l
+                ld a,(hl)
+                ld (de),a
+                ld b,b
+
+                ld de,0
+.adr2:          equ $-2
+                ld l,l
+                ld a,(hl)
+                ld (de),a
+                ld b,b
+
+                ld de,0
+.adr3:          equ $-2
+                ld d,d
+                ld a,44
+                ld l,l
+                ld a,(hl)
+                ld (de),a
+                ld b,b
+                ei
+                ld bc,276
+                add hl,bc
+                pop af
+                POP BC
+                INC A
+                DJNZ .loop
+                pop af
+                OUT (EmmWin.P3),A
+                pop af
+                OUT (EmmWin.P1),A
+                RET
 CoordToAddrP3:  push de
                 ld de,#c000
                 add hl,de
