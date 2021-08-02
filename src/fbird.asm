@@ -70,6 +70,12 @@ main:	        di
                 ld e,0
                 ld a,1
                 call SetPalette
+                ld hl,Palette+1
+                ld a,(Palette)
+                ld d,a
+                ld e,0
+                ld a,0
+                call SetPalette
 
                 ; ld hl,TempPal
                 ; call ResetPallete
@@ -86,12 +92,13 @@ main:	        di
                 ; call UnfadePallete
                 call FillScreen
                 call DrawCity
-                ld a,1
-                ld (Im2Handler.needChangePage),a        ;Переключаем основной экран на 1
-                ei
-                halt
+                call DrawWay
+                in a,(RGMOD)
+                xor 1
+                out (RGMOD),a
                 call FillScreen
                 call DrawCity
+                call DrawWay
                 in a,(RGMOD)
                 and a
                 ld a,1
@@ -99,6 +106,9 @@ main:	        di
                 ld (Im2Handler.needChangePage),a        ;Переключаем основной экран на 1
 .loop:          ei
                 halt
+                ld a,1
+                ld (Im2Handler.needChangePage),a
+
                 ; call Update0Screen
                 ; call UpdateScreenFlag
                 call CheckKeys
@@ -241,13 +251,13 @@ DrawCity:
                 and 1
                 jr nz,.firstpg
                 ld hl,#4140
-                ld de,138
+.firstpg:       ld de,138
                 ld (.adr1),hl
                 add hl,de
                 ld (.adr2),hl
                 add hl,de
                 ld (.adr3),hl
-.firstpg:       ld hl,#c000     ;city sprite
+                ld hl,#c000     ;city sprite
                 ld a,0
 .pos:           equ $-1
                 ld c,a
@@ -295,6 +305,77 @@ DrawCity:
                 pop af
                 OUT (EmmWin.P1),A
                 RET
+
+DrawWay:
+                IN A,(EmmWin.P1)
+                push af
+                IN A,(EmmWin.P3)
+                push af
+                LD A,#50
+                OUT (EmmWin.P1),A
+                ld a,(MemoryBuffer.memWay)
+                out (EmmWin.P3),a
+                ld hl,#4000
+                in a,(RGMOD)
+                and 1
+                jr nz,.firstpg
+                ld hl,#4140
+.firstpg:       
+                ld de,132
+                ld (.adr1),hl
+                add hl,de
+                ld (.adr2),hl
+                add hl,de
+                ld (.adr3),hl
+                ld hl,#c000     ;city sprite
+                ld a,0
+.pos:           equ $-1
+                ld c,a
+                ld b,0
+                add hl,bc
+                ld b,11        ;way hgt
+                ld a,220        ;way Y pos
+.loop:	        PUSH BC
+                push af
+                OUT (#89),A
+                di
+                ld de,0
+.adr1:          equ $-2                
+                ld d,d		;enable accel, set buffer size
+                ld a,132        ;pattern lenght
+                ld l,l
+                ld a,(hl)
+                ld (de),a
+                ld b,b
+
+                ld de,0
+.adr2:          equ $-2
+                ld l,l
+                ld a,(hl)
+                ld (de),a
+                ld b,b
+
+                ld de,0
+.adr3:          equ $-2
+                ld d,d
+                ld a,56
+                ld l,l
+                ld a,(hl)
+                ld (de),a
+                ld b,b
+                ei
+                ld bc,140
+                add hl,bc
+                pop af
+                POP BC
+                INC A
+                DJNZ .loop
+                pop af
+                OUT (EmmWin.P3),A
+                pop af
+                OUT (EmmWin.P1),A
+                RET
+
 CoordToAddrP3:  push de
                 ld de,#c000
                 add hl,de
