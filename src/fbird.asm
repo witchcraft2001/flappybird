@@ -90,13 +90,13 @@ main:	        di
                 ; ld b,a
                 ; ld c,0
                 ; call UnfadePallete
-                call FillScreen
+                call FillShadowScreen
                 call DrawCity
                 call DrawWay
                 in a,(RGMOD)
                 xor 1
                 out (RGMOD),a
-                call FillScreen
+                call FillShadowScreen
                 call DrawCity
                 call DrawWay
                 in a,(RGMOD)
@@ -106,6 +106,10 @@ main:	        di
                 ld (Im2Handler.needChangePage),a        ;Переключаем основной экран на 1
 .loop:          ei
                 halt
+                call UpdateCityPos
+                call UpdateWayPos
+                call DrawCity
+                call DrawWay
                 ld a,1
                 ld (Im2Handler.needChangePage),a
 
@@ -172,6 +176,18 @@ LoadResource:   ld  a,(de)
                 rst #10
                 pop af
                 ret
+FillShadowScreen:
+                in a,(EmmWin.P3)
+                push af
+                ld a,#50
+                out (EmmWin.P3),a
+                ld bc,320
+                in a,(RGMOD)
+                ld hl,#c000
+                and 1
+                jr nz,FillScreen.firstScreen
+                ld hl,#c140
+                jr FillScreen.firstScreen
 
 FillScreen:     in a,(EmmWin.P3)
                 push af
@@ -235,6 +251,16 @@ FillScreen:     in a,(EmmWin.P3)
                 ld b,b
                 pop af
                 out (EmmWin.P3),a
+                ret
+UpdateCityPos:  in a,(RGMOD)
+                and 1
+                ret z
+                ld a,(DrawCity.pos)
+                inc a
+                cp 138
+                jr c,.less
+                xor a
+.less:          ld (DrawCity.pos),a
                 ret
 
 DrawCity:       
@@ -305,7 +331,14 @@ DrawCity:
                 pop af
                 OUT (EmmWin.P1),A
                 RET
-
+UpdateWayPos:   ld a,(DrawWay.pos)
+                ; add a,2
+                inc a
+                cp 12
+                jr c,.less
+                xor a
+.less:          ld (DrawWay.pos),a
+                ret
 DrawWay:
                 IN A,(EmmWin.P1)
                 push af
@@ -321,7 +354,7 @@ DrawWay:
                 jr nz,.firstpg
                 ld hl,#4140
 .firstpg:       
-                ld de,132
+                ld de,120
                 ld (.adr1),hl
                 add hl,de
                 ld (.adr2),hl
@@ -342,7 +375,7 @@ DrawWay:
                 ld de,0
 .adr1:          equ $-2                
                 ld d,d		;enable accel, set buffer size
-                ld a,132        ;pattern lenght
+                ld a,120        ;pattern lenght
                 ld l,l
                 ld a,(hl)
                 ld (de),a
@@ -358,13 +391,13 @@ DrawWay:
                 ld de,0
 .adr3:          equ $-2
                 ld d,d
-                ld a,56
+                ld a,80
                 ld l,l
                 ld a,(hl)
                 ld (de),a
                 ld b,b
                 ei
-                ld bc,140
+                ld bc,140       ;sprite width
                 add hl,bc
                 pop af
                 POP BC
