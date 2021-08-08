@@ -3,3 +3,6 @@ assets.png cutted\grass_color.png 319 1 1 1
 assets.png cutted\wall_color.png 319 2 1 1
 assets.png cutted\city.png 0 0 276 39
 assets.png cutted\way.png 0 39 140 11
+assets.png cutted\bird0.png 0 50 17 12
+assets.png cutted\bird1.png 17 50 17 12
+assets.png cutted\bird2.png 34 50 17 12

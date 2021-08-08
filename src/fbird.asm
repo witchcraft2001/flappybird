@@ -4,7 +4,7 @@
                 include "include\bios_equ.asm"
                 include "include\sp_equ.asm"
 
-begin:		    jp main
+begin:		jp main
 
 main:	        di
 ;                ld (DOSLine+1),ix
@@ -106,8 +106,10 @@ main:	        di
                 ld (Im2Handler.needChangePage),a        ;Переключаем основной экран на 1
 .loop:          ei
                 halt
+                call UpdateBirdState
                 call UpdateCityPos
                 call UpdateWayPos
+                call DrawBird
                 call DrawCity
                 call DrawWay
                 ld a,1
@@ -252,6 +254,20 @@ FillScreen:     in a,(EmmWin.P3)
                 pop af
                 out (EmmWin.P3),a
                 ret
+
+UpdateBirdState:
+                in a,(RGMOD)
+                and 1
+                ret z
+                ld a,0
+.state:         equ $-1
+                inc a
+                cp 2
+                jr c,.less
+                xor a
+.less:          ld (UpdateBirdState.state),a
+                ret
+
 UpdateCityPos:  in a,(RGMOD)
                 and 1
                 ret z
@@ -261,6 +277,48 @@ UpdateCityPos:  in a,(RGMOD)
                 jr c,.less
                 xor a
 .less:          ld (DrawCity.pos),a
+                ret
+
+DrawBird:       
+                IN A,(EmmWin.P1)
+                push af
+                IN A,(EmmWin.P3)
+                push af
+                LD A,#5C
+                OUT (EmmWin.P1),A
+                ld a,(MemoryBuffer.memBirds)
+                out (EmmWin.P3),a
+                ld hl,#c000
+                ld bc,204
+                ld a,(UpdateBirdState.state)
+                and a
+                jr z,.null
+.addAdr:        add hl,bc
+                dec a
+                jr nz,.addAdr
+.null:          push hl                
+                ld hl,#4000 + 16
+                in a,(RGMOD)
+                and 1
+                jr nz,.firstpg
+                ld hl,#4140 + 16
+.firstpg:       ld b,12         ;hgt
+                ld a,100        ;Y pos
+                pop de
+                ex hl,de
+.loop:          out (Y_PORT),a
+                push bc
+                push de
+                ld bc,17
+                ldir
+                pop de
+                pop bc
+                inc a
+                djnz .loop
+                pop af
+                OUT (EmmWin.P3),A
+                pop af
+                OUT (EmmWin.P1),A
                 ret
 
 DrawCity:       
@@ -572,15 +630,17 @@ Counter:        db 0
 fHandler        db 0
 
 MemoryBuffer:
-.memCity      db 0
-.memWay       db 0
+.memCity        db 0
+.memWay         db 0
+.memBirds       db 0
 .memMusic       db 0
                 db 0
-assetsBlocks    db 3
+assetsBlocks    db 4
 
 AssetsDirName   db "ASSETS",0
 city            db "city.bin",0
 way             db "way.bin",0
+birds           db "birds.bin",0
 music           db "music.bin",0
 MemoryDescriptor:
                 db 0

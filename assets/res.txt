@@ -3,3 +3,6 @@
 ..\cutted\wall_color.png
 ..\cutted\city.png
 ..\cutted\way.png
+..\cutted\bird0.png
+..\cutted\bird1.png
+..\cutted\bird2.png
