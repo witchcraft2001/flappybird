@@ -109,9 +109,11 @@ main:	        di
                 call UpdateBirdState
                 call UpdateCityPos
                 call UpdateWayPos
-                call DrawBird
+                call UpdateBirdCoord
+                call RestoreBirdBackground                
                 call DrawCity
                 call DrawWay
+                call DrawBird
                 ld a,1
                 ld (Im2Handler.needChangePage),a
 
@@ -254,6 +256,51 @@ FillScreen:     in a,(EmmWin.P3)
                 pop af
                 out (EmmWin.P3),a
                 ret
+RestoreBirdBackground:
+                in a,(RGMOD)
+                ld de,BirdFirstY
+                and 1
+                jr nz,.first
+                ld de,BirdSecondY
+.first:         ld a,(de)
+                cp #ff
+                ret z
+                ld hl,#c000+16
+                ld bc,#110c
+                jp RestoreRect
+UpdateBirdCoord:
+                ld a,(BirdY)
+                ld b,a
+                ld a,(PressedKey)
+                and a
+                jr z,.down
+                ld a,b
+                and a
+                ret z
+                dec a
+                ld (BirdY),a
+                ret
+.down:          ld a,0
+.state:         equ $-1
+                ld e,a
+                inc a
+                ld (.state),a
+                ld d,0
+                ld hl,DownTable
+                add hl,de
+                ld a,(hl)
+                add a,b
+                cp 240
+                jr nc,.over
+                ld (BirdY),a
+                ret
+.over:          ld a,240
+                ld (BirdY),a
+                xor a
+                ld (.state),a
+                inc a
+                ld (GemeOver),a
+                ret
 
 UpdateBirdState:
                 in a,(RGMOD)
@@ -298,12 +345,15 @@ DrawBird:
                 jr nz,.addAdr
 .null:          push hl                
                 ld hl,#4000 + 16
+                ld de,BirdFirstY
                 in a,(RGMOD)
                 and 1
                 jr nz,.firstpg
+                ld de,BirdSecondY
                 ld hl,#4140 + 16
 .firstpg:       ld b,12         ;hgt
-                ld a,100        ;Y pos
+                ld a,(BirdY)
+                ld (de),a
                 pop de
                 ex hl,de
 .loop:          out (Y_PORT),a
@@ -652,17 +702,23 @@ Page1:          db 0
 Page2:          db 0
 Page3:          db 0
 
-CardCoord0:      
-.y:             db 0
-.x:             dw 0
+; CardCoord0:      
+; .y:             db 0
+; .x:             dw 0
 
-CardCoord1:
-.y:             db 0
-.x:             dw 0
+; CardCoord1:
+; .y:             db 0
+; .x:             dw 0
+
+GemeOver:       db 0
+BirdY:          db 100
+BirdFirstY:     db #ff
+BirdSecondY:    db #ff
 
                 include "grx_utils.asm"
                 include "sys_utils.asm"
                 include "im2_utils.asm"
+                include "bird_tab.asm"
                 
 Palette:
                 include "res_pal.asm"

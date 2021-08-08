@@ -294,20 +294,19 @@ RestoreRect:
 	ei
 	ret	
 
-
 ;Восстанавливает из теневого экрана прямоугольник
 ;HL - Addr
 ;B - Len
 ;C - Height
 ;A - Y
-RestoreBackground:
+RestoreBackgroundShadow:
 	ex af,af'
 	IN A,(EmmWin.P3)
 	push af
 	LD A,#50
 	OUT (EmmWin.P3),A
 	ld a,c
-	ld (.hgt),a	
+	ld (.hgt),a
 	push hl
 	ld de,#140
 	add hl,de

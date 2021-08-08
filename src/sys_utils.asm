@@ -11,14 +11,18 @@ WaitSpaceKey:
         ret
 
 CheckKeys:
+	xor	a
+	ld	(PressedKey),a
 	ld	c,Dss.ScanKey
 	rst	#10
 	ret	z
 	cp	#1B
-	ret	nz
-	scf
+	jr	z,.esc
+	ld	(PressedKey),a
+	ret
+.esc:	scf
         ret
-
+PressedKey:	db	0
 ; процедура сохранения страницы в указнном окне.
 ; C = окно (порт)
 ; HL = куда сохранять.
