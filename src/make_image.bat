@@ -1,22 +1,31 @@
 rem echo OFF
+set PROG=FBIRD
 mkdir build
 echo Unmounting old image ...
 osfmount.com -D -m X:
 
 echo Assembling ...
-tools\sjasmplus\sjasmplus.exe fbird.asm --lst=fbird.lst
+tools\sjasmplus\sjasmplus.exe %PROG%.asm --lst=%PROG%.lst
 if errorlevel 1 goto ERR
 
 echo Preparing floppy disk image ...
-copy /Y image\dss_image.img build\FBIRD.img
+copy /Y image\dss_image.img build\%PROG%.img
 rem Delay before copy image
 timeout 2 > nul
-osfmount.com -a -t file -o rw -f build/FBIRD.img -m X:
+osfmount.com -a -t file -o rw -f build/%PROG%.img -m X:
 if errorlevel 1 goto ERR
-mkdir X:\FBIRD
-mkdir X:\FBIRD\ASSETS
-copy /Y FBIRD.EXE /B X:\FBIRD\ /B
-copy /Y assets\*.b* /B X:\FBIRD\ASSETS\ /B
+mkdir X:\%PROG%
+mkdir X:\%PROG%\ASSETS
+copy /Y %PROG%.EXE /B X:\%PROG%\ /B
+copy /Y assets\*.b* /B X:\%PROG%\ASSETS\ /B
+
+mkdir build\%PROG%
+mkdir build\%PROG%\ASSETS
+
+copy /Y %PROG%.EXE /B X:\%PROG%\ /B
+copy /Y assets\*.b* /B X:\%PROG%\ASSETS /B
+copy /Y %PROG%.EXE /B build\%PROG%\ /B
+copy /Y assets\*.b* /B build\%PROG%\ASSETS /B
 
 if errorlevel 1 goto ERR
 rem Delay before unmounting image
@@ -32,7 +41,7 @@ rem exit
 goto END
 :SUCCESS
 echo Copying image to ZXMAK2 Emulator
-copy /Y build\FBIRD.img /B %SPRINTER_EMULATOR% /B
+copy /Y build\%PROG%.img /B %SPRINTER_EMULATOR% /B
 echo Done!
 :END
 pause 0

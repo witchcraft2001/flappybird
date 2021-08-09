@@ -6,3 +6,9 @@
 ..\cutted\bird0.png
 ..\cutted\bird1.png
 ..\cutted\bird2.png
+..\cutted\tube0dn.png
+..\cutted\tube0up.png
+..\cutted\tube0md.png
+..\cutted\tube1dn.png
+..\cutted\tube1up.png
+..\cutted\tube1md.png

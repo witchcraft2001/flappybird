@@ -6,3 +6,9 @@ assets.png cutted\way.png 0 39 140 11
 assets.png cutted\bird0.png 0 50 17 12
 assets.png cutted\bird1.png 17 50 17 12
 assets.png cutted\bird2.png 34 50 17 12
+assets.png cutted\tube0up.png 0 96 26 13
+assets.png cutted\tube0dn.png 28 243 26 13
+assets.png cutted\tube0md.png 0 109 26 1
+assets.png cutted\tube1up.png 84 96 26 13
+assets.png cutted\tube1dn.png 56 243 26 13
+assets.png cutted\tube1md.png 84 109 26 1

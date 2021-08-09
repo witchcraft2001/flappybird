@@ -7,6 +7,10 @@ set_im2:
 	LD	(hl),e
 	INC	hl
 	LD	(hl),d
+	; ld    a,1            ;select reg1
+    	; out    (19h),a
+    	; ld    a,0            ;no ints
+    	; out    (19h),a
 
 	;запуск режима IM2
 	LD	a,i           	;сохранение
