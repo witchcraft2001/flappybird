@@ -109,7 +109,6 @@ main:	        di
                 call UpdateBirdState
                 call UpdateCityPos
                 call UpdateWayPos
-                call UpdateBirdCoord
                 call RestoreBirdBackground                
                 call DrawCity
                 call DrawWay
@@ -120,6 +119,9 @@ main:	        di
                 ; call Update0Screen
                 ; call UpdateScreenFlag
                 call CheckKeys
+                push af
+                call nc,UpdateBirdCoord
+                pop af
                 jp nc,.loop
 
 .exit:
@@ -266,35 +268,50 @@ RestoreBirdBackground:
                 cp #ff
                 ret z
                 ld hl,#c000+16
-                ld bc,#110c
+                ld bc,#0c11
                 jp RestoreRect
 UpdateBirdCoord:
-                ld a,(BirdY)
-                ld b,a
-                ld a,(PressedKey)
-                and a
+                ; ld a,(BirdY)
+                ; ld b,a
+                ; ld a,(PressedKey)
+                ; and a
                 jr z,.down
-                ld a,b
+                xor a
+                ld (.state),a
+                ld a,6
+                ld (.count),a
+                ld a,(BirdY)
                 and a
                 ret z
-                dec a
-                ld (BirdY),a
+                sub 5
+                jr nc,.less
+                xor a
+.less:          ld (BirdY),a
                 ret
-.down:          ld a,0
+.down:          ld a,6
+.count:         equ $-1
+                and a
+                jr z,.skip
+                dec a
+                ld (.count),a
+                ret
+.skip:          ld a,0
 .state:         equ $-1
                 ld e,a
                 inc a
                 ld (.state),a
+                ld a,(BirdY)
+                ld b,a
                 ld d,0
                 ld hl,DownTable
                 add hl,de
                 ld a,(hl)
                 add a,b
-                cp 240
+                cp 208
                 jr nc,.over
                 ld (BirdY),a
                 ret
-.over:          ld a,240
+.over:          ld a,208
                 ld (BirdY),a
                 xor a
                 ld (.state),a
@@ -309,7 +326,7 @@ UpdateBirdState:
                 ld a,0
 .state:         equ $-1
                 inc a
-                cp 2
+                cp 3
                 jr c,.less
                 xor a
 .less:          ld (UpdateBirdState.state),a
@@ -733,7 +750,7 @@ code_end:
 PlayerStart:
                 include "pt3play.asm"
 MusicModule:
-                incbin "music\mus1.pt3"
+                incbin "music\mus2.pt3"
 PlayerEnd:
                 savebin "assets\music.bin",PlayerStart,PlayerEnd-PlayerStart
                 savebin "FBIRD.EXE",start_addr,code_end-start_addr

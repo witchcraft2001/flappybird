@@ -20,7 +20,8 @@ CheckKeys:
 	jr	z,.esc
 	ld	(PressedKey),a
 	ret
-.esc:	scf
+.esc:	xor a
+	scf
         ret
 PressedKey:	db	0
 ; процедура сохранения страницы в указнном окне.
