@@ -629,6 +629,26 @@ PlayerMute:
                 call PlayerStart+8
                 jr PlayerInit.exit
 
+DrawTubeHead:   ld hl,0
+                ld bc,TubeWidth
+                push bc
+                add hl,bc
+                ld de,320
+                and a
+                sbc hl,de
+                jr c,.full
+                push hl
+                pop bc
+                pop hl
+                and a
+                sbc hl,bc       ; visible width of sprite
+                jr .sizeSet
+.full:          ld hl,TubeWidth
+.sizeSet:       ld a,l
+                ld (.len),a
+
+
+
 Im2Handler:     di
                 push af
                 push hl
@@ -700,14 +720,16 @@ MemoryBuffer:
 .memCity        db 0
 .memWay         db 0
 .memBirds       db 0
+.memTubes       db 0
 .memMusic       db 0
                 db 0
-assetsBlocks    db 4
+assetsBlocks    db 5
 
 AssetsDirName   db "ASSETS",0
 city            db "city.bin",0
 way             db "way.bin",0
 birds           db "birds.bin",0
+tubes           db "tubes.bin",0
 music           db "music.bin",0
 MemoryDescriptor:
                 db 0
@@ -736,15 +758,25 @@ BirdSecondY:    db #ff
                 include "sys_utils.asm"
                 include "im2_utils.asm"
                 include "bird_tab.asm"
-                
+       
 Palette:
                 include "res_pal.asm"
 PaletteEnd:
                 
+RedTubeDn:      equ #C000
+RedTubeUp:      equ RedTubeDn+338
+RedTubeMiddle:  equ RedTubeUp+338
+GreenTubeDn:    equ RedTubeMiddle+194
+GreenTubeUp:    equ GreenTubeDn+338
+GreenTubeMiddle: equ GreenTubeUp+338
+
+TubeWidth:      equ 26
+TubeHeadHeight: equ 13
 
 AppDir:	        equ ($/80h)*80h+80h
 AssetsDir:	equ AppDir + 128
 code_end:
+
 
                 org 0xC000
 PlayerStart:
