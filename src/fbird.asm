@@ -115,13 +115,11 @@ main:	        di
                 call DrawBird
                 ld a,1
                 ld (Im2Handler.needChangePage),a
+                call UpdateBirdCoord
 
                 ; call Update0Screen
                 ; call UpdateScreenFlag
                 call CheckKeys
-                push af
-                call nc,UpdateBirdCoord
-                pop af
                 jp nc,.loop
 
 .exit:
@@ -275,7 +273,8 @@ UpdateBirdCoord:
                 ; ld b,a
                 ; ld a,(PressedKey)
                 ; and a
-                jr z,.down
+                call CheckSpace
+                jr nz,.down
                 xor a
                 ld (.state),a
                 ld a,6
@@ -629,23 +628,23 @@ PlayerMute:
                 call PlayerStart+8
                 jr PlayerInit.exit
 
-DrawTubeHead:   ld hl,0
-                ld bc,TubeWidth
-                push bc
-                add hl,bc
-                ld de,320
-                and a
-                sbc hl,de
-                jr c,.full
-                push hl
-                pop bc
-                pop hl
-                and a
-                sbc hl,bc       ; visible width of sprite
-                jr .sizeSet
-.full:          ld hl,TubeWidth
-.sizeSet:       ld a,l
-                ld (.len),a
+; DrawTubeHead:   ld hl,0
+;                 ld bc,TubeWidth
+;                 push bc
+;                 add hl,bc
+;                 ld de,320
+;                 and a
+;                 sbc hl,de
+;                 jr c,.full
+;                 push hl
+;                 pop bc
+;                 pop hl
+;                 and a
+;                 sbc hl,bc       ; visible width of sprite
+;                 jr .sizeSet
+; .full:          ld hl,TubeWidth
+; .sizeSet:       ld a,l
+;                 ld (.len),a
 
 
 

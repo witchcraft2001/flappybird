@@ -57,7 +57,7 @@ Dss.CTRLKey	EQU	#33
 ;Dss.EDIT	EQU	#34
 Dss.K_CLEAR	EQU	#35
 Dss.K_SETUP	EQU	#36
-Dss.TESTKEY	EQU	#37
+Dss.TestKey	EQU	#37
 ;Memory
 Dss.SetWin	EQU	#38
 Dss.SetWin1	EQU	#39
