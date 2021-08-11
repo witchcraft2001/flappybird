@@ -13,7 +13,7 @@ WaitSpaceKey:
 CheckKeys:
 	xor	a
 	ld	(PressedKey),a
-	ld	c,Dss.ScanKey
+	ld	c,Dss.TestKey
 	rst	#10
 	ret	z
 	cp	#1B
