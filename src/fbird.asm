@@ -629,8 +629,54 @@ PlayerMute:
                 call PlayerStart+8
                 jr PlayerInit.exit
 
-DrawTubeHead:   ld hl,0
-                ld bc,TubeWidth
+;HL - X position
+;A - Y of head
+DrawTube:       ex af,af'
+                in a,(EmmWin.P3)
+                push af
+                in a,(EmmWin.P0)
+                push af
+                ld a,(MemoryBuffer.memTubes)
+                out (EmmWin.P3),a
+                ld a,#5c
+                out (EmmWin.P1),a
+                ld hl,0         ;X
+                push hl
+                ld a,h          ;check for left hided size (if x is negative)
+                and 254
+                jr z,.positive
+                ;todo: handle negative case
+                pop de
+                push de
+                and a
+                ld hl,TubeWidth
+                add hl,de
+                ld a,l
+                ld (DrawTubeHead.len),a
+                pop de
+                ld hl,0
+                and a
+                sbc hl,de
+                in a,(RGMOD)
+                ld de,#4000
+                and 1
+                jr nz,.firstpg1
+                ld de,#4140
+.firstpg1:      push hl
+                push de
+                ld bc,RedTubeDn
+                add hl,bc
+                ex af,af'
+                push af
+                call DrawTubeHead
+                pop af                
+                pop hl
+                add a,80
+                ld bc,RedTubeUp
+                add hl,bc
+                call DrawTubeHead
+                jr .exit
+.positive:      ld bc,TubeWidth
                 push bc
                 add hl,bc
                 ld de,320
@@ -645,9 +691,55 @@ DrawTubeHead:   ld hl,0
                 jr .sizeSet
 .full:          ld hl,TubeWidth
 .sizeSet:       ld a,l
-                ld (.len),a
-
-
+                ld (DrawTubeHead.len),a
+                pop hl
+                in a,(RGMOD)
+                ld de,#4000
+                and 1
+                jr nz,.firstpg
+                ld de,#4140
+.firstpg:       add hl,de
+                ex hl,de
+                ld hl,RedTubeDn
+                ex af,af'
+                push af
+                push de
+                call DrawTubeHead
+                pop de
+                pop af
+                add a,80
+                ld hl,RedTubeUp
+                call DrawTubeHead
+.exit:          pop af
+                out (EmmWin.P0),a
+                pop af
+                out (EmmWin.P3),a
+                ret
+;Draw Tube Head
+;HL - Sprite
+;DE - Address
+;A' - Y
+DrawTubeHead:   ex af,af'
+                ld a,TubeHeadHeight
+                ld b,0
+                ld c,0                
+.len:           equ $-1
+.loop:          ex af,af'
+                out (Y_PORT),a
+                inc a
+                push de
+                push hl
+                push bc
+                ldir
+                pop bc
+                pop hl
+                ld de,TubeWidth
+                add hl,de
+                pop de
+                ex af,af'
+                dec a
+                jr nz,.loop
+                ret
 
 Im2Handler:     di
                 push af
