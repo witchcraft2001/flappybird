@@ -109,9 +109,12 @@ main:	        di
                 call UpdateBirdState
                 call UpdateCityPos
                 call UpdateWayPos
-                call RestoreBirdBackground                
+                call RestoreBirdBackground
                 call DrawCity
                 call DrawWay
+                ld hl,#ffff - 10
+                ld a,100
+                call DrawTube
                 call DrawBird
                 ld a,1
                 ld (Im2Handler.needChangePage),a
@@ -639,7 +642,7 @@ DrawTube:       ex af,af'
                 out (EmmWin.P3),a
                 ld a,#5c
                 out (EmmWin.P1),a
-                ld hl,0         ;X
+                ; ld hl,0         ;X
                 push hl
                 ld a,h          ;check for left hided size (if x is negative)
                 and 254
@@ -669,6 +672,7 @@ DrawTube:       ex af,af'
                 push af
                 call DrawTubeHead
                 pop af                
+                pop de
                 pop hl
                 add a,80
                 ld bc,RedTubeUp
@@ -688,7 +692,7 @@ DrawTube:       ex af,af'
                 and a
                 sbc hl,bc       ; visible width of sprite
                 jr .sizeSet
-.full:          ld hl,TubeWidth
+.full:          pop hl
 .sizeSet:       ld a,l
                 ld (DrawTubeHead.len),a
                 pop hl
