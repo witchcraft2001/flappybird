@@ -112,7 +112,7 @@ main:	        di
                 call RestoreBirdBackground
                 call DrawCity
                 call DrawWay
-                ld hl,#ffff - 10
+                ld hl,100
                 ld a,100
                 call DrawTube
                 call DrawBird
@@ -671,7 +671,7 @@ DrawTube:       ex af,af'
                 ex af,af'
                 push af
                 call DrawTubeHead
-                pop af                
+                pop af
                 pop de
                 pop hl
                 add a,80
@@ -707,17 +707,75 @@ DrawTube:       ex af,af'
                 ex af,af'
                 push af
                 push de
+                push de
+                push af
                 call DrawTubeHead
+                pop af
+                sub TubeHeadHeight
+                ld b,a
+                ld a,(DrawTubeHead.len)
+                ld c,a
+                xor a
+                ld hl,RedTubeMiddle
+                pop de
+                push bc
+                call DrawTubeBody
+                pop bc
                 pop de
                 pop af
+
+                push de
+                push af
+                add a,80+TubeHeadHeight
+                push af
+                ld b,a
+                ld a,240
+                sub b
+                ld b,a
+                pop af
+                ld hl,RedTubeMiddle
+                call DrawTubeBody
+
+                pop af
+                pop de
                 add a,80
                 ld hl,RedTubeUp
+                ; push af
+                ; push de
                 call DrawTubeHead
+                ; pop de
+                ; pop af
+                ; add a,TubeHeadHeight
+                ; ld hl,RedTubeMiddle
+                ; call DrawTubeBody
 .exit:          pop af
                 out (EmmWin.P0),a
                 pop af
                 out (EmmWin.P3),a
                 ret
+;HL - Sprite
+;DE - Address
+;A - Y
+;B - Hgt
+;C - Len
+DrawTubeBody:   ex af,af'
+                ld a,b
+                ld (.hgt),a
+                di
+                ld d,d
+                ld b,0
+.hgt:           equ $-1
+                ld b,b
+                ld b,0
+                ex af,af'
+.loop:          out (Y_PORT),a
+                ld e,e
+                ldi
+                ld b,b
+                jp pe,.loop
+                ei
+                ret
+
 ;Draw Tube Head
 ;HL - Sprite
 ;DE - Address
