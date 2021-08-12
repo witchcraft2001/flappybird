@@ -115,13 +115,11 @@ main:	        di
                 call DrawBird
                 ld a,1
                 ld (Im2Handler.needChangePage),a
+                call UpdateBirdCoord
 
                 ; call Update0Screen
                 ; call UpdateScreenFlag
                 call CheckKeys
-                push af
-                call nc,UpdateBirdCoord
-                pop af
                 jp nc,.loop
 
 .exit:
@@ -275,7 +273,8 @@ UpdateBirdCoord:
                 ; ld b,a
                 ; ld a,(PressedKey)
                 ; and a
-                jr z,.down
+                call CheckSpace
+                jr nz,.down
                 xor a
                 ld (.state),a
                 ld a,6
