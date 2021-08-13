@@ -487,7 +487,7 @@ DrawWay:
                 ld (.adr2),hl
                 add hl,de
                 ld (.adr3),hl
-                ld hl,#c000     ;city sprite
+                ld hl,#c000     ;sprite
                 ld a,0
 .pos:           equ $-1
                 ld c,a
@@ -729,7 +729,7 @@ DrawTube:       ex af,af'
                 add a,80+TubeHeadHeight
                 push af
                 ld b,a
-                ld a,240
+                ld a,220
                 sub b
                 ld b,a
                 pop af
@@ -758,7 +758,9 @@ DrawTube:       ex af,af'
 ;A - Y
 ;B - Hgt
 ;C - Len
-DrawTubeBody:   ex af,af'
+DrawTubeBody:   and a
+                sbc a,b
+                ex af,af'
                 ld a,b
                 ld (.hgt),a
                 di
