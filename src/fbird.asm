@@ -711,7 +711,7 @@ DrawTube:       ex af,af'
                 push af
                 call DrawTubeHead
                 pop af
-                sub TubeHeadHeight
+                ; sub TubeHeadHeight
                 ld b,a
                 ld a,(DrawTubeHead.len)
                 ld c,a
@@ -758,8 +758,9 @@ DrawTube:       ex af,af'
 ;A - Y
 ;B - Hgt
 ;C - Len
-DrawTubeBody:   and a
-                sbc a,b
+DrawTubeBody:   
+                ; and a
+                ; sbc a,b
                 ex af,af'
                 ld a,b
                 ld (.hgt),a
@@ -768,13 +769,18 @@ DrawTubeBody:   and a
                 ld b,0
 .hgt:           equ $-1
                 ld b,b
-                ld b,0
                 ex af,af'
-.loop:          out (Y_PORT),a
+                ld b,a
+.loop:          ld a,b
+                out (Y_PORT),a
+                ld a,(hl)
                 ld e,e
-                ldi
+                ld (de),a
                 ld b,b
-                jp pe,.loop
+                inc hl
+                inc de
+                dec c
+                jr nz,.loop
                 ei
                 ret
 
