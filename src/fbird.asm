@@ -112,8 +112,14 @@ main:	        di
                 call RestoreBirdBackground
                 call DrawCity
                 call DrawWay
-                ld hl,100
+                ld hl,300
                 ld a,100
+                call DrawTube
+                ld hl,0 - 10
+                ld a,50
+                call DrawTube
+                ld hl,100
+                ld a,20
                 call DrawTube
                 call DrawBird
                 ld a,1
@@ -666,18 +672,48 @@ DrawTube:       ex af,af'
                 ld de,#4140
 .firstpg1:      push hl
                 push de
-                ld bc,RedTubeDn
+                ld bc,RedTubeMiddle
                 add hl,bc
+                ld (.middle),hl
                 ex af,af'
                 push af
+                ld b,a
+                ld a,(DrawTubeHead.len)
+                ld c,a
+                xor a
+                call DrawTubeBody
+                pop af
+                pop de
+                pop hl
+                push hl
+                push de
+                push af
+
+                ld bc,RedTubeDn
+                add hl,bc
                 call DrawTubeHead
+
                 pop af
                 pop de
                 pop hl
                 add a,80
                 ld bc,RedTubeUp
                 add hl,bc
+                push de
+                push af
                 call DrawTubeHead
+                pop af
+                ld hl,0
+.middle:        equ $-2
+                pop de
+                add a,TubeHeadHeight
+                ex af,af'
+                ld b,a
+                ld a,220
+                sub b
+                ld b,a
+                ex af,af'
+                call DrawTubeBody
                 jr .exit
 .positive:      ld bc,TubeWidth
                 push bc
