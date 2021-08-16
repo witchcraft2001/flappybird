@@ -112,15 +112,9 @@ main:	        di
                 call RestoreBirdBackground
                 call DrawCity
                 call DrawWay
-                ld hl,300
-                ld a,100
-                call DrawTube
-                ld hl,0 - 10
-                ld a,50
-                call DrawTube
-                ld hl,100
-                ld a,20
-                call DrawTube
+                call RestoreTubes
+                call UpdateTubes
+                call DrawTubes                
                 call DrawBird
                 ld a,1
                 ld (Im2Handler.needChangePage),a
@@ -265,6 +259,7 @@ FillScreen:     in a,(EmmWin.P3)
                 pop af
                 out (EmmWin.P3),a
                 ret
+
 RestoreBirdBackground:
                 in a,(RGMOD)
                 ld de,BirdFirstY
@@ -277,6 +272,7 @@ RestoreBirdBackground:
                 ld hl,#c000+16
                 ld bc,#0c11
                 jp RestoreRect
+
 UpdateBirdCoord:
                 ; ld a,(BirdY)
                 ; ld b,a
@@ -637,9 +633,140 @@ PlayerMute:
                 call PlayerStart+8
                 jr PlayerInit.exit
 
+DrawTubes:      ld ix,Tubes
+                ld iy,Tubes1
+                in a,(RGMOD)
+                and 1
+                jr z,.firstpg
+                ld iy,Tubes0
+.firstpg:       ld b,TUBES_COUNT
+                ld de,3
+.loop:          ld l,(ix+0)
+                ld h,(ix+1)
+                ld (iy+0),l
+                ld (iy+1),h
+                ld a,(ix+2)
+                ld (iy+2),a
+                call DrawTube
+                add ix,de
+                add iy,de
+                djnz .loop
+                ret
+
+RestoreTubes:   in a,(RGMOD)
+                ld ix,Tubes1
+                and 1
+                jr z,.firstpg
+                ld ix,Tubes0
+.firstpg:       ld b,TUBES_COUNT
+                ld de,3
+.loop:          ld l,(ix+0)
+                ld h,(ix+1)
+                ld a,(ix+2)
+                and a
+                call nz,RestoreTube
+                add ix,de
+                djnz .loop
+                ret
+
+UpdateTubes:    ld ix,Tubes
+                ld b,TUBES_COUNT
+                ld de,3
+.loop:          call UpdateTube
+                add ix,de
+                djnz .loop
+                ret
+
+UpdateTube:     push de
+                ld l,(ix+0)
+                ld h,(ix+1)
+                dec hl
+                ld (ix+0),l
+                ld (ix+1),h
+                bit 7,h
+                jr z,.end
+                ld de,TubeWidth
+                and a
+                add hl,de
+                ld a,h
+                or l
+                jr nz,.end
+                ld hl,319
+                ld (ix+0),l
+                ld (ix+1),h
+.end:           pop de
+                ret
+
+;HL - X position
+RestoreTube:    push bc
+                push de
+                in a,(EmmWin.P3)
+                push af
+                ld a,#50
+                out (EmmWin.P3),a
+                push hl
+                ld a,h          ;check for left hided size (if x is negative)
+                and 254
+                jr z,.positive
+                pop de
+                and a
+                ld hl,TubeWidth
+                add hl,de
+                ld b,l
+                ld hl,0
+                jr .restore
+
+.positive:      ld bc,TubeWidth
+                push bc
+                add hl,bc
+                ld de,320
+                and a
+                sbc hl,de
+                jr c,.full
+                push hl
+                pop bc
+                pop hl
+                and a
+                sbc hl,bc       ; visible width of sprite
+                jr .sizeSet
+.full:          pop hl
+.sizeSet:       ld b,l                
+                pop hl
+.restore:       in a,(RGMOD)
+                ld de,#c000
+                and 1
+                jr nz,.firstpg
+                ld de,#c140
+.firstpg:       add hl,de
+                di
+                ld d,d
+                ld a,220
+                ld b,b
+                xor a
+                push hl
+                pop de
+.loop:          out (Y_PORT),a
+                ld a,a
+                ld c,(hl)
+                ld b,b
+                out (Y_PORT),a
+                ld a,a
+                ld (hl),c
+                ld b,b
+                inc hl
+                djnz .loop
+                pop af
+                out (EmmWin.P3),a
+                pop de
+                pop bc
+                ei
+                ret
+
 ;HL - X position
 ;A - Y of head
-DrawTube:       ex af,af'
+DrawTube:       push bc
+                push de
+                ex af,af'
                 in a,(EmmWin.P3)
                 push af
                 in a,(EmmWin.P0)
@@ -788,6 +915,8 @@ DrawTube:       ex af,af'
                 out (EmmWin.P0),a
                 pop af
                 out (EmmWin.P3),a
+                pop de
+                pop bc
                 ret
 ;HL - Sprite
 ;DE - Address
@@ -950,6 +1079,20 @@ GemeOver:       db 0
 BirdY:          db 100
 BirdFirstY:     db #ff
 BirdSecondY:    db #ff
+
+Tubes:
+                dw 100
+                db 70
+
+                dw 220
+                db 30
+
+                dw 319
+                db 110
+
+TUBES_COUNT     equ 2
+Tubes0          ds TUBES_COUNT*3,0
+Tubes1          ds TUBES_COUNT*3,0
 
                 include "grx_utils.asm"
                 include "sys_utils.asm"
