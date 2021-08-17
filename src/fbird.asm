@@ -1122,7 +1122,7 @@ code_end:
 PlayerStart:
                 include "pt3play.asm"
 MusicModule:
-                incbin "music\mus2.pt3"
+                incbin "music\mus1.pt3"
 PlayerEnd:
                 savebin "assets\music.bin",PlayerStart,PlayerEnd-PlayerStart
                 savebin "FBIRD.EXE",start_addr,code_end-start_addr
