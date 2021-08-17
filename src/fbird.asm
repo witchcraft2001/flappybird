@@ -700,6 +700,8 @@ UpdateTube:     push de
 ;HL - X position
 RestoreTube:    push bc
                 push de
+                ld de,TubeWidth-TubeWidthRestored
+                add hl,de                
                 in a,(EmmWin.P3)
                 push af
                 ld a,#50
@@ -710,13 +712,19 @@ RestoreTube:    push bc
                 jr z,.positive
                 pop de
                 and a
-                ld hl,TubeWidth
+                ld hl,TubeWidthRestored
                 add hl,de
                 ld b,l
                 ld hl,0
                 jr .restore
 
-.positive:      ld bc,TubeWidth
+.positive:      ld bc,320
+                push hl
+                and a
+                sbc hl,bc
+                pop hl
+                jr nc,.skip
+                ld bc,TubeWidthRestored
                 push bc
                 add hl,bc
                 ld de,320
@@ -755,13 +763,14 @@ RestoreTube:    push bc
                 ld b,b
                 inc hl
                 djnz .loop
-                pop af
+.exit:          pop af
                 out (EmmWin.P3),a
                 pop de
                 pop bc
                 ei
                 ret
-
+.skip:          pop de
+                jp .exit
 ;HL - X position
 ;A - Y of head
 DrawTube:       push bc
@@ -1111,6 +1120,7 @@ GreenTubeUp:    equ GreenTubeDn+338
 GreenTubeMiddle: equ GreenTubeUp+338
 
 TubeWidth:      equ 26
+TubeWidthRestored: equ TubeWidth-20
 TubeHeadHeight: equ 13
 
 AppDir:	        equ ($/80h)*80h+80h
