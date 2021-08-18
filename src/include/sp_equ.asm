@@ -5,3 +5,5 @@ EmmWin.P3	EQU	#E2
 Y_PORT          EQU     #89
 RGADR           EQU     Y_PORT
 RGMOD           EQU     #C9
+SIO_CONTROL_A   EQU     #19
+SIO_DATA_REG_A  EQU     #18

@@ -1,5 +1,6 @@
                 device zxspectrum128
                 include "include\head.asm"
+                include "include\keyboard.asm"
                 include "include\dss_equ.asm"
                 include "include\bios_equ.asm"
                 include "include\sp_equ.asm"
@@ -999,6 +1000,9 @@ Im2Handler:     di
                 push de
                 push ix
                 push iy
+.loop:          in a,(SIO_CONTROL_A)
+                bit 0,a                ; 0-bit, байт пришел ?
+                call nz,KeysHandler     ; да, это прерывание от клавиатуры
 	        ld a,0
 .needChangePage: equ $-1
 	        and a
@@ -1031,7 +1035,7 @@ Im2Handler:     di
                 pop hl
                 pop af
                 ei
-                jp #38
+                reti
 
 NotEnoughtMemoryMessage:
                 db cr,lf,"Error: Not enought memory!",cr,lf
@@ -1099,7 +1103,7 @@ Tubes:
                 dw 319
                 db 110
 
-TUBES_COUNT     equ 2
+TUBES_COUNT     equ 3
 Tubes0          ds TUBES_COUNT*3,0
 Tubes1          ds TUBES_COUNT*3,0
 

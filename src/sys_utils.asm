@@ -1,32 +1,58 @@
 WaitSpaceKey:
-.loop
-	ld	c,Dss.ScanKey
-	rst	#10
-	jr	z,.loop
-	cp	#20
-	ret	z
-	cp	#1B
-	jr	nz,.loop
-	scf
-        ret
+.skip:		xor a
+		ld (KeyPressed),a
+.loop:		ld a,(KeyPressed)
+		and a
+		jr z,.loop
+		cp KEY_SPACE		;Space
+		ret z
+		cp KEY_ESC
+		jr nz,.loop
+		scf
+		ret
 
 CheckKeys:
-	; xor	a
-	; ld	(PressedKey),a
-	ld	c,Dss.ScanKey
-	rst	#10
-	ret	z
-	cp	#1B
-	ret	nz
-.esc:	xor a
-	scf
-        ret
+		ld a,(KeyPressed)
+		and a
+		ret z
+		cp KEY_ESC
+		jr z,.esc
+		and a
+		ret 
+.esc:		xor a
+		scf
+		ret
+
 CheckSpace:
-	ld a,127
-        in a,(#FE)
-        and 1
-	ret
-PressedKey:	db	0
+		ld a,127
+		in a,(#FE)
+		and 1
+		ret
+
+KeysHandler:
+.loop:          in a,(SIO_CONTROL_A)
+                bit 0,a                 ; 0-bit, байт пришел ?
+                ret z           	; нет
+                in a,(SIO_DATA_REG_A)
+                cp #F0
+                jr nz,.key
+                ld a,1
+                ld (.needskipkey),a
+                jr .loop
+.key: 
+                cp #E0
+                jr z,.skipkey
+                ld c,0
+.needskipkey:   equ $-1
+                bit 0,c
+                jr nz,.skipkey
+                ld (KeyPressed),a
+.skipkey:       xor a
+                ld (.needskipkey),a
+                jr .loop
+
+
+KeyPressed:	db	0
 ; процедура сохранения страницы в указнном окне.
 ; C = окно (порт)
 ; HL = куда сохранять.
