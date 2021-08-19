@@ -1001,8 +1001,8 @@ Im2Handler:     di
                 push ix
                 push iy
 .loop:          in a,(SIO_CONTROL_A)
-                bit 0,a                ; 0-bit, байт пришел ?
-                call nz,KeysHandler     ; да, это прерывание от клавиатуры
+                bit 0,a                 ; 0-bit, байт пришел ?
+                jr nz,.keys             ; да, это прерывание от клавиатуры
 	        ld a,0
 .needChangePage: equ $-1
 	        and a
@@ -1020,7 +1020,9 @@ Im2Handler:     di
                 call nz,Player
                 pop af
                 out (EmmWin.P3),a
-                pop iy
+                jp .end
+.keys:          call KeysHandler
+.end:           pop iy
                 pop ix
                 pop de
                 pop bc
