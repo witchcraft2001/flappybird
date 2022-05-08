@@ -4,6 +4,10 @@
                 include "include\dss_equ.asm"
                 include "include\bios_equ.asm"
                 include "include\sp_equ.asm"
+CTC_CH0     equ $10
+CTC_CH1     equ $11
+CTC_CH2     equ $12
+CTC_CH3     equ $13
 
 begin:		jp main
 
@@ -78,12 +82,38 @@ main:	        di
                 ld a,0
                 call SetPalette
 
+                ld c,$A6 : ld b,2 : rst 8
+
                 ; ld hl,TempPal
                 ; call ResetPallete
                 ; call ShowBackground
                 ; call CopyBackground
-                ld de,Im2Handler
+
+                ;ld de,Im2Handler
+                ;call set_im2
+
+                ld de,Im2Empty ;Im2Handler
                 call set_im2
+                ld hl,Im2Handler
+                ;ld ($8000),hl
+                ;ld ($8002),hl
+                ;ld ($8004),hl
+                ld ($8006),hl
+;
+                ei : halt : halt : di
+;
+                ld b,12
+                djnz $
+
+                ld a,0x57 : out (CTC_CH2),a
+                ld a,112  : out (CTC_CH2),a
+                ld a,0xd7 : out (CTC_CH3),a
+                ld a,160  : out (CTC_CH3),a
+                ld a,0    : out (CTC_CH0),a
+
+                ld de,Im2FFHandler
+                call set_im2
+
                 call PlayerInit
                 ; ld hl,Palette+1
                 ; ld de,TempPal
@@ -105,8 +135,10 @@ main:	        di
                 ld a,1
                 jr nz,.loop
                 ld (Im2Handler.needChangePage),a        ;Переключаем основной экран на 1
-.loop:          ei
-                halt
+.loop:          ;ei
+                ;halt
+                call WaitVsync
+                ld a,1 : out ($FE),a
                 call UpdateBirdState
                 call UpdateCityPos
                 call UpdateWayPos
@@ -127,6 +159,11 @@ main:	        di
                 jp nc,.loop
 
 .exit:
+                ld a,0x57 : out (CTC_CH3),a
+                ld a,160  : out (CTC_CH3),a
+
+                ld c,$A6 : ld b,3 : rst 8
+
                 in a,(RGMOD)
                 and 1                
                 call nz,ChangeVideoPage
@@ -145,14 +182,20 @@ main:	        di
                 call RestoreVideoMode
                 call RestorePages
                 ld bc,Dss.Exit
-	        rst #10
-	        ret
+                rst #10
+                ret
 
 .error:         pop hl
                 pop de
                 pop bc
                 jp  FileReadError
 
+WaitVsync:      xor a : ld r,a : ld a,3 : out (#FE),a
+.loop           ei : halt
+                ld a,r
+                jp p,.loop
+                ret
+                
 ;Обновляем флаг необходимости смены основного экрана
 UpdateScreenFlag:
                 ld a,1
@@ -985,7 +1028,17 @@ DrawTubeHead:   ex af,af'
                 jr nz,.loop
                 ret
 
-Im2Handler:     di
+CtcHandler:     push af
+.brd    equ $+1 : ld a,0
+                out ($FE),a
+                inc a
+                and 7
+                ld (.brd),a
+                pop af
+                ei
+                reti
+
+Im2FFHandler:   di
                 push af
                 push hl
                 push bc
@@ -1000,26 +1053,10 @@ Im2Handler:     di
                 push de
                 push ix
                 push iy
+                ld a,6 : out ($FE),a
 .loop:          in a,(SIO_CONTROL_A)
                 bit 0,a                 ; 0-bit, байт пришел ?
                 jr nz,.keys             ; да, это прерывание от клавиатуры
-	        ld a,0
-.needChangePage: equ $-1
-	        and a
-	        jr z,.skip
-                call ChangeVideoPage
-                xor a
-                ld (.needChangePage),a
-.skip:          in a,(EmmWin.P3)
-                push af
-                ld hl,Counter
-                inc (hl)
-                ld a,0
-.musicEnabled:  equ $-1
-                and a
-                call nz,Player
-                pop af
-                out (EmmWin.P3),a
                 jp .end
 .keys:          call KeysHandler
 .end:           pop iy
@@ -1038,6 +1075,63 @@ Im2Handler:     di
                 pop af
                 ei
                 reti
+
+Im2Handler:     di
+                push af
+                push hl
+                push bc
+                push de
+                push ix
+                push iy
+                exx
+                ex af,af'
+                push af
+                push hl
+                push bc
+                push de
+                push ix
+                push iy
+                ld a,4 : out ($FE),a
+                ld a,255 : LD R,A
+    	        ld a,0
+.needChangePage: equ $-1
+                and a
+                jr z,.skip
+                call ChangeVideoPage
+                xor a
+                ld (.needChangePage),a
+.skip:          in a,(EmmWin.P3)
+                push af
+                ld hl,Counter
+                inc (hl)
+                ld a,0
+.musicEnabled:  equ $-1
+                and a
+                call nz,Player
+                pop af
+                out (EmmWin.P3),a
+.loop:          in a,(SIO_CONTROL_A)
+                bit 0,a                 ; 0-bit, байт пришел ?
+                jr z,.end             ; да, это прерывание от клавиатуры
+.keys:          call KeysHandler
+.end:           pop iy
+                pop ix
+                pop de
+                pop bc
+                pop hl
+                pop af
+                ex af,af'
+                exx
+                pop iy
+                pop ix
+                pop de
+                pop bc
+                pop hl
+                pop af
+                ei
+                reti
+
+Im2Empty:   ei : reti       
 
 NotEnoughtMemoryMessage:
                 db cr,lf,"Error: Not enought memory!",cr,lf
