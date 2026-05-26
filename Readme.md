@@ -38,8 +38,33 @@ The computer is built on a standard computer tower configuration, using standard
 - sjasmplus assembler
 - osfmount utility (for creating disk images)
 - ZXMAK2 emulator (for testing)
+- Python 3
+- mtools (for cross-platform disk image updates)
 
 ## Building
+
+### macOS / Cross-platform Build
+
+To build the executable and copy it with assets into `build/FBIRD.img` using `mtools`:
+
+```bash
+make
+```
+
+Useful targets:
+
+```bash
+make resources   # regenerate PNG cuts and binary resources with Python tools
+make exe         # assemble src/FBIRD.EXE and src/assets/music.bin
+make image       # create build/FBIRD.img and copy files with mtools
+make clean       # remove build output
+```
+
+The assembler command defaults to `sjasmplus`; override it if needed:
+
+```bash
+make SJASM=/path/to/sjasmplus
+```
 
 ### Simple Build
 

@@ -1,2 +1,15 @@
-src/build/FBIRD.img
-src/build
+.DS_Store
+build/
+src/build/
+src/FBIRD.EXE
+src/fbird.lst
+src/res_pal.asm
+src/assets/*.bin
+assets/cutted/
+assets/resources/
+tools/__pycache__/
+__pycache__/
+*.pyc
+**/.vs/
+**/bin/
+**/obj/

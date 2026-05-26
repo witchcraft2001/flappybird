@@ -1,3 +1,4 @@
-mkdir cutted
-..\tools\img_cutter\ImageCutter\ImageCutter\bin\Debug\netcoreapp3.1\ImageCutter.exe cut.txt
+@echo off
+mkdir cutted 2>nul
+python ..\tools\imagecutter.py cut.txt
 pause 0

@@ -1,9 +1,9 @@
                 device zxspectrum128
-                include "include\head.asm"
-                include "include\keyboard.asm"
-                include "include\dss_equ.asm"
-                include "include\bios_equ.asm"
-                include "include\sp_equ.asm"
+                include "include/head.asm"
+                include "include/keyboard.asm"
+                include "include/dss_equ.asm"
+                include "include/bios_equ.asm"
+                include "include/sp_equ.asm"
 
 begin:		jp main
 
@@ -1138,7 +1138,7 @@ code_end:
 PlayerStart:
                 include "pt3play.asm"
 MusicModule:
-                incbin "music\mus1.pt3"
+                incbin "music/mus1.pt3"
 PlayerEnd:
-                savebin "assets\music.bin",PlayerStart,PlayerEnd-PlayerStart
+                savebin "assets/music.bin",PlayerStart,PlayerEnd-PlayerStart
                 savebin "FBIRD.EXE",start_addr,code_end-start_addr
