@@ -89,6 +89,7 @@ main:	        di
                 ld de,Im2Handler
                 call set_im2
                 call PlayerInit
+                call InitRenderCache
                 ; ld hl,Palette+1
                 ; ld de,TempPal
                 ; ld a,(Palette)
@@ -112,19 +113,7 @@ main:	        di
 .loop:          call WaitVsync
                 ld a,2
                 out (#fe),a
-                call UpdateBirdState
-                call UpdateCityPos
-                call UpdateWayPos
-                call RestoreBirdBackground
-                call DrawCity
-                call DrawWay
-                call RestoreTubes
-                call UpdateTubes
-                call DrawTubes                
-                call DrawBird
-                ld a,1
-                ld (Im2Handler.needChangePage),a
-                call UpdateBirdCoord
+                call RunRenderCache
                 xor a
                 out (#fe),a
                 ; call Update0Screen
@@ -798,8 +787,6 @@ DrawTube:       push bc
                 ex af,af'
                 in a,(EmmWin.P3)
                 push af
-                in a,(EmmWin.P0)
-                push af
                 ld a,(MemoryBuffer.memTubes)
                 out (EmmWin.P3),a
                 ld a,#5c
@@ -941,8 +928,6 @@ DrawTube:       push bc
                 ; ld hl,RedTubeMiddle
                 ; call DrawTubeBody
 .exit:          pop af
-                out (EmmWin.P0),a
-                pop af
                 out (EmmWin.P3),a
                 pop de
                 pop bc
@@ -1126,6 +1111,52 @@ Tubes:
 TUBES_COUNT     equ 3
 Tubes0          ds TUBES_COUNT*3,0
 Tubes1          ds TUBES_COUNT*3,0
+
+InitRenderCache:
+                call OpenCacheWindow
+                ld hl,CacheRenderCodeStored
+                ld de,CACHE_RENDER_BASE
+                ld bc,CacheRenderCodeStoredEnd-CacheRenderCodeStored
+                ldir
+                call CloseCacheWindow
+                ei
+                ret
+
+RunRenderCache:
+                call OpenCacheWindow
+                ei
+                call CacheRenderFrame
+                di
+                call CloseCacheWindow
+                ei
+                ret
+
+OpenCacheWindow:
+                push bc
+                di
+                xor a
+                ld bc,ISA_SYSTEM_PORT
+                out (c),a
+                ld a,SYS_MAP_CACHE
+                out (SYS_PORT_OFF),a
+                in a,(CACHE_ON_PORT)
+                pop bc
+                ret
+
+CloseCacheWindow:
+                push bc
+                in a,(CACHE_OFF_PORT)
+                ld a,SYS_MAP_DSS
+                out (SYS_PORT_OFF),a
+                ld bc,ISA_SYSTEM_PORT
+                ld a,ISA_SYSTEM_DSS
+                out (c),a
+                pop bc
+                ret
+
+CacheRenderCodeStored:
+                include "cache_render.asm"
+CacheRenderCodeStoredEnd:
 
                 include "grx_utils.asm"
                 include "sys_utils.asm"
