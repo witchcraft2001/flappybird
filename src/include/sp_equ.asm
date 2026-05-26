@@ -7,3 +7,7 @@ RGADR           EQU     Y_PORT
 RGMOD           EQU     #C9
 SIO_CONTROL_A   EQU     #19
 SIO_DATA_REG_A  EQU     #18
+CTC_CH0         EQU     #10
+CTC_CH1         EQU     #11
+CTC_CH2         EQU     #12
+CTC_CH3         EQU     #13

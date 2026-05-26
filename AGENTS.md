@@ -29,3 +29,22 @@ Recent commits use short, direct messages such as `fixed filename` and `added re
 ## Agent-Specific Instructions
 
 Do not overwrite unrelated generated files or local build outputs unless the task requires regeneration. Preserve existing `.bat` workflows and bundled tools unless replacing them is explicitly requested.
+
+## External reference sources
+- You may consult the following local sibling repositories/directories for answers, platform details, and implementation ideas:
+  - `/Users/dmitry/dev/zx/sprinter/sprinter_bios`
+  - `/Users/dmitry/dev/zx/sprinter/sprinter_dss`
+  - `/Users/dmitry/dev/zx/sprinter/sprinter_ai_doc/manual`
+  - `/Users/dmitry/dev/zx/sprinter/sources/tasm_071/TASM`
+  - `/Users/dmitry/dev/zx/sprinter/sources/fformat/src/fformat_v113`
+  - `/Users/dmitry/dev/zx/sprinter/sources/fm/FM-SRC/FM`
+  - `/Users/dmitry/dev/zx/sprinter/gfxview`
+  - `/Users/dmitry/dev/zx/sprinter/gifview`
+  - `/Users/dmitry/dev/zx/sprinter/flexnavigator`
+  - `/Users/dmitry/dev/zx/sprinter/sources/nupogodi`
+  - `/Users/dmitry/dev/zx/sprinter/sources/2DSTUDIO`
+  - `/Users/dmitry/dev/zx/sprinter/sources/DOOM2`
+  - `/Users/dmitry/dev/zx/sprinter/sdcc-sprinter-sdk`
+  - `/Users/dmitry/dev/zx/sprinter/zx-sprinter-sdk`
+  - `/Users/dmitry/dev/zx/sprinter/sources/DOOM2`
+  - `/Users/dmitry/dev/zx/sprinter/games/titd/src`

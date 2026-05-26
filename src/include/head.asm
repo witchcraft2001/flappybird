@@ -11,10 +11,11 @@ code_start:
 		dw 0
 		dw 0
 		dw 0
-		dw begin
+		dw 8100h
 		dw begin
 		dw 0bfffh
 		ds 490
+		db 0            ; reserved for IM2 table byte at #8100
 		
 ;		.PHASE 8100h
 		

@@ -7,6 +7,10 @@
 
 begin:		jp main
 
+                org #8181
+Im2DefaultVector:
+                jp Im2OtherHandler
+
 main:	        di
 ;                ld (DOSLine+1),ix
                 call SavePages
@@ -105,8 +109,9 @@ main:	        di
                 ld a,1
                 jr nz,.loop
                 ld (Im2Handler.needChangePage),a        ;Переключаем основной экран на 1
-.loop:          ei
-                halt
+.loop:          call WaitVsync
+                ld a,2
+                out (#fe),a
                 call UpdateBirdState
                 call UpdateCityPos
                 call UpdateWayPos
@@ -120,9 +125,11 @@ main:	        di
                 ld a,1
                 ld (Im2Handler.needChangePage),a
                 call UpdateBirdCoord
-
+                xor a
+                out (#fe),a
                 ; call Update0Screen
                 ; call UpdateScreenFlag
+                call KeysHandler
                 call CheckKeys
                 jp nc,.loop
 
@@ -157,6 +164,18 @@ main:	        di
 UpdateScreenFlag:
                 ld a,1
                 ld (Im2Handler.needChangePage),a
+                ret
+
+WaitVsync:      di
+                xor a
+                ld (Im2Handler.vsyncFlag),a
+.loop:          ei
+                halt
+                di
+                ld a,(Im2Handler.vsyncFlag)
+                and a
+                jr z,.loop
+                ei
                 ret
 
 LoadResource:   ld  a,(de)
@@ -1000,13 +1019,10 @@ Im2Handler:     di
                 push de
                 push ix
                 push iy
-.loop:          in a,(SIO_CONTROL_A)
-                bit 0,a                 ; 0-bit, байт пришел ?
-                jr nz,.keys             ; да, это прерывание от клавиатуры
-	        ld a,0
+		ld a,0
 .needChangePage: equ $-1
-	        and a
-	        jr z,.skip
+		and a
+		jr z,.skip
                 call ChangeVideoPage
                 xor a
                 ld (.needChangePage),a
@@ -1020,8 +1036,9 @@ Im2Handler:     di
                 call nz,Player
                 pop af
                 out (EmmWin.P3),a
+                ld a,1
+                ld (.vsyncFlag),a
                 jp .end
-.keys:          call KeysHandler
 .end:           pop iy
                 pop ix
                 pop de
@@ -1038,6 +1055,7 @@ Im2Handler:     di
                 pop af
                 ei
                 reti
+.vsyncFlag:     db 0
 
 NotEnoughtMemoryMessage:
                 db cr,lf,"Error: Not enought memory!",cr,lf

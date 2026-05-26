@@ -1,29 +1,42 @@
 ;Установка IM2 и нового вектора прерываний
 ;DE - обработчик прерываний
 set_im2:
-        ;устанавливаем адрес процедуры перехватчик прерываний
-	; LD	de,im2_handler
-	LD	hl,#80FF
-	LD	(hl),e
-	INC	hl
-	LD	(hl),d
-	; ld    a,1            ;select reg1
-    	; out    (19h),a
-    	; ld    a,0            ;no ints
-    	; out    (19h),a
-
-	;запуск режима IM2
-	LD	a,i           	;сохранение
-	LD	(set_im1.save_i),a  ;     регистра прерываний
-	LD	a,#80
-	DI
-	LD	i,a		;i=#80
-	IM	2
-	EI
+        ld      a,i
+        ld      (set_im1.save_i),a
+        di
+        push    de
+        ld      hl,#8000
+        ld      de,#8001
+        ld      bc,256
+        ld      (hl),#81
+        ldir
+        ld      a,#C3
+        ld      (Im2DefaultVector),a
+        ld      hl,Im2EmptyHandler
+        ld      (Im2DefaultVector+1),hl
+        ld      a,#80
+        ld      i,a
+        im      2
+.sync:  ei
+        halt
+        di
+        in      a,(SIO_CONTROL_A)
+        bit     0,a
+        jr      z,.synced
+        call    KeysHandler
+        jr      .sync
+.synced:
+        pop     hl
+        ld      (#8006),hl
+        call    StartFrameTimer
+        ld      hl,Im2OtherHandler
+        ld      (Im2DefaultVector+1),hl
+        ei
         ret
 ;Восстановление режима IM1 и предыдущего значения вектора прерываний
 set_im1:
         di
+        call    StopFrameTimer
         ld      a,0
 .save_i: equ    $-1
         ld      i,a
@@ -31,3 +44,39 @@ set_im1:
         ei
         ret
 
+StartFrameTimer:
+        ld      a,#57
+        out     (CTC_CH2),a
+        ld      a,112
+        out     (CTC_CH2),a
+        ld      a,#D7
+        out     (CTC_CH3),a
+        ld      a,160
+        out     (CTC_CH3),a
+        xor     a
+        out     (CTC_CH0),a
+        ret
+
+StopFrameTimer:
+        ld      a,#03
+        out     (CTC_CH2),a
+        out     (CTC_CH3),a
+        ret
+
+Im2EmptyHandler:
+        ei
+        reti
+
+Im2OtherHandler:
+        di
+        push    af
+        push    bc
+        push    de
+        push    hl
+        call    KeysHandler
+        pop     hl
+        pop     de
+        pop     bc
+        pop     af
+        ei
+        reti
