@@ -8,6 +8,7 @@ BUILD_DIR := build
 DIST_DIR := $(BUILD_DIR)/$(PROGRAM)
 IMAGE_TEMPLATE := $(SRC_DIR)/image/dss_image.img
 IMAGE := $(BUILD_DIR)/$(PROGRAM).img
+GAME_ASSETS := city.bin way.bin birds.bin tubes.bin ui.bin gopanel.bin music.bin
 
 .PHONY: all cut resources exe image clean
 
@@ -19,12 +20,12 @@ cut:
 resources: cut
 	mkdir -p $(ASSETS_DIR)/resources
 	cd $(ASSETS_DIR)/resources && $(PYTHON) ../../tools/resources.py ../res.txt
-	cat $(ASSETS_DIR)/resources/bird0.bin $(ASSETS_DIR)/resources/bird1.bin $(ASSETS_DIR)/resources/bird2.bin > $(ASSETS_DIR)/resources/birds.bin
+	cat $(ASSETS_DIR)/resources/bird0.bin $(ASSETS_DIR)/resources/bird1.bin $(ASSETS_DIR)/resources/bird2.bin $(ASSETS_DIR)/resources/bird3.bin > $(ASSETS_DIR)/resources/birds.bin
 	cat $(ASSETS_DIR)/resources/tube0dn.bin $(ASSETS_DIR)/resources/tube0up.bin $(ASSETS_DIR)/resources/tube0md.bin $(ASSETS_DIR)/resources/tube1dn.bin $(ASSETS_DIR)/resources/tube1up.bin $(ASSETS_DIR)/resources/tube1md.bin > $(ASSETS_DIR)/resources/tubes.bin
 	cat $(ASSETS_DIR)/resources/big_digit*.bin $(ASSETS_DIR)/resources/small_digit*.bin $(ASSETS_DIR)/resources/coin*.bin $(ASSETS_DIR)/resources/ui_hand.bin $(ASSETS_DIR)/resources/title_get_ready.bin $(ASSETS_DIR)/resources/title_game_over.bin $(ASSETS_DIR)/resources/title_flappybird.bin > $(ASSETS_DIR)/resources/ui.bin
 	mkdir -p $(SRC_DIR)/assets
 	cp $(ASSETS_DIR)/resources/res_pal.asm $(SRC_DIR)/res_pal.asm
-	cp $(ASSETS_DIR)/resources/city.bin $(ASSETS_DIR)/resources/way.bin $(ASSETS_DIR)/resources/birds.bin $(ASSETS_DIR)/resources/tubes.bin $(ASSETS_DIR)/resources/ui.bin $(SRC_DIR)/assets/
+	cp $(ASSETS_DIR)/resources/city.bin $(ASSETS_DIR)/resources/way.bin $(ASSETS_DIR)/resources/birds.bin $(ASSETS_DIR)/resources/tubes.bin $(ASSETS_DIR)/resources/ui.bin $(ASSETS_DIR)/resources/gopanel.bin $(SRC_DIR)/assets/
 
 exe: resources
 	cd $(SRC_DIR) && $(SJASM) fbird.asm --lst=fbird.lst
@@ -35,10 +36,10 @@ image: exe
 	mmd -i $(IMAGE) ::/$(PROGRAM)
 	mmd -i $(IMAGE) ::/$(PROGRAM)/ASSETS
 	mcopy -o -i $(IMAGE) $(SRC_DIR)/$(PROGRAM).EXE ::/$(PROGRAM)/
-	mcopy -o -i $(IMAGE) $(SRC_DIR)/assets/*.b* ::/$(PROGRAM)/ASSETS/
+	$(foreach asset,$(GAME_ASSETS),mcopy -o -i $(IMAGE) $(SRC_DIR)/assets/$(asset) ::/$(PROGRAM)/ASSETS/$(asset);)
 	mkdir -p $(DIST_DIR)/ASSETS
 	cp $(SRC_DIR)/$(PROGRAM).EXE $(DIST_DIR)/
-	cp $(SRC_DIR)/assets/*.b* $(DIST_DIR)/ASSETS/
+	$(foreach asset,$(GAME_ASSETS),cp $(SRC_DIR)/assets/$(asset) $(DIST_DIR)/ASSETS/$(asset);)
 
 clean:
 	rm -rf $(BUILD_DIR) $(ASSETS_DIR)/cutted $(ASSETS_DIR)/resources $(SRC_DIR)/assets $(SRC_DIR)/res_pal.asm $(SRC_DIR)/FBIRD.EXE $(SRC_DIR)/fbird.lst

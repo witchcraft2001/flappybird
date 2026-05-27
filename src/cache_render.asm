@@ -1,20 +1,63 @@
                 DISP CACHE_RENDER_BASE
 
 CacheRenderFrame:
+                ld a,(GemeOver)
+                and a
+                jr z,.checkReady
+                call CacheCheckGameOverRestart
+                ld a,(GemeOver)
+                and a
+                jr z,.checkReady
+                jp CacheRenderGameOver
+.checkReady:    ld a,(ReadyCounter)
+                and a
+                jr z,.play
+                jp CacheRenderReady
+.play:
                 call CacheUpdateBirdState
                 call CacheUpdateCityPos
                 call CacheUpdateWayPos
                 call CacheRestoreBirdBackground
+                call CacheCleanupReadyOverlay
                 call CacheDrawCity
                 call CacheDrawWay
                 call CacheRestoreTubes
                 call CacheUpdateTubes
+                call CacheUpdateBirdCoord
+                call CacheCheckCollisions
                 call CacheDrawTubes
                 call CacheDrawBird
                 call CacheDrawScore
+                jp CacheFinishFrame
+
+CacheRenderReady:
+                call CacheRestoreBirdBackground
+                call CacheDrawCity
+                call CacheDrawWay
+                call CacheRestoreTubes
+                call CacheRestoreReadyOverlay
+                call CacheDrawTubes
+                call CacheDrawBird
+                call CacheDrawScore
+                call CacheDrawGetReadyTitle
+                call CacheDrawReadyCountdown
+                call CacheUpdateReadyCounter
+                jp CacheFinishFrame
+
+CacheRenderGameOver:
+                call CacheRestoreBirdBackground
+                call CacheDrawCity
+                call CacheDrawWay
+                call CacheRestoreTubes
+                call CacheGameOverFall
+                call CacheDrawTubes
+                call CacheDrawBird
+                call CacheDrawScore
+                call CacheDrawGameOverTitle
+                call CacheDrawGameOverPanel
+CacheFinishFrame:
                 ld a,1
                 ld (Im2Handler.needChangePage),a
-                call CacheUpdateBirdCoord
                 ret
 
 CacheRestoreBirdBackground:
@@ -72,9 +115,199 @@ CacheUpdateBirdCoord:
                 ld (BirdY),a
                 xor a
                 ld (.state),a
-                inc a
-                ld (GemeOver),a
+                jp CacheSetGameOver
+
+CacheGameOverFall:
+                ld a,(BirdY)
+                cp 208
+                ret nc
+                add a,4
+                cp 208
+                jr c,.store
+                ld a,208
+.store:         ld (BirdY),a
                 ret
+
+CacheCheckGameOverRestart:
+                ld a,(GameOverRestartDelay)
+                and a
+                jr z,.canRestart
+                dec a
+                ld (GameOverRestartDelay),a
+                call CacheCheckSpace
+                ret z
+                xor a
+                ld (GameOverWaitRelease),a
+                ret
+.canRestart:
+                call CacheCheckSpace
+                jr z,.pressed
+                xor a
+                ld (GameOverWaitRelease),a
+                ret
+.pressed:       ld a,(GameOverWaitRelease)
+                and a
+                ret nz
+                jp CacheRestartGame
+
+CacheRestartGame:
+                call CacheClearPlayfieldPages
+                xor a
+                ld (GemeOver),a
+                ld (GameOverWaitRelease),a
+                ld (GameOverRestartDelay),a
+                ld (Score),a
+                ld (Score+1),a
+                ld (TubeYIndex),a
+                ld (ReadyCleanupCounter),a
+                ld (CacheUpdateBirdState.state),a
+                ld (CacheUpdateBirdCoord.state),a
+                ld (CacheDrawCity.pos),a
+                ld (CacheDrawWay.pos),a
+                ld a,6
+                ld (CacheUpdateBirdCoord.count),a
+                ld a,100
+                ld (BirdY),a
+                ld a,#ff
+                ld (BirdFirstY),a
+                ld (BirdSecondY),a
+                ld a,150
+                ld (ReadyCounter),a
+                xor a
+                ld (CurrentBiome),a
+                ld a,112
+                ld (CurrentTubeInterval),a
+                ld a,80
+                ld (CurrentTubeGap),a
+                ld (CacheDrawTubeGap),a
+                ld a,r
+                xor #5a
+                or 1
+                ld (RandomSeed),a
+                ld hl,InitialTubes
+                ld de,Tubes
+                ld bc,TUBES_COUNT*TUBE_ENTRY_SIZE
+                ldir
+                xor a
+                ld hl,Tubes0
+                ld de,Tubes0+1
+                ld bc,TUBES_COUNT*TUBE_ENTRY_SIZE-1
+                ld (hl),a
+                ldir
+                ld hl,Tubes1
+                ld de,Tubes1+1
+                ld bc,TUBES_COUNT*TUBE_ENTRY_SIZE-1
+                ld (hl),a
+                ldir
+                ret
+
+CacheSetGameOver:
+                ld a,(GemeOver)
+                and a
+                ret nz
+                ld a,1
+                ld (GemeOver),a
+                ld (GameOverWaitRelease),a
+                ld a,75
+                ld (GameOverRestartDelay),a
+                ret
+
+CacheUpdateReadyCounter:
+                ld a,(ReadyCounter)
+                and a
+                ret z
+                dec a
+                ld (ReadyCounter),a
+                ret nz
+                ld a,2
+                ld (ReadyCleanupCounter),a
+                ret
+
+CacheCleanupReadyOverlay:
+                ld a,(ReadyCleanupCounter)
+                and a
+                ret z
+                dec a
+                ld (ReadyCleanupCounter),a
+                jp CacheClearReadyOverlaySky
+
+CacheResetRenderHistory:
+                ld a,#ff
+                ld (BirdFirstY),a
+                ld (BirdSecondY),a
+                xor a
+                ld hl,Tubes0
+                ld de,Tubes0+1
+                ld bc,TUBES_COUNT*TUBE_ENTRY_SIZE-1
+                ld (hl),a
+                ldir
+                ld hl,Tubes1
+                ld de,Tubes1+1
+                ld bc,TUBES_COUNT*TUBE_ENTRY_SIZE-1
+                ld (hl),a
+                ldir
+                ret
+
+CacheCheckCollisions:
+                ld a,(BirdY)
+                cp 208
+                jp nc,CacheSetGameOver
+                ld ix,Tubes
+                ld b,TUBES_COUNT
+                ld de,TUBE_ENTRY_SIZE
+.loop:          push bc
+                push de
+                ld l,(ix+0)
+                ld h,(ix+1)
+                bit 7,h
+                jr nz,.checkLeft
+                push hl
+                ld de,32
+                and a
+                sbc hl,de
+                pop hl
+                jr nc,.next
+.checkLeft:     push hl
+                ld de,TubeWidth
+                add hl,de
+                ld de,18
+                and a
+                sbc hl,de
+                jr c,.offLeft
+                ld a,h
+                or l
+                jr z,.offLeft
+                pop hl
+                ld a,(BirdY)
+                add a,2
+                ld c,a
+                ld a,(ix+2)
+                add a,TubeHeadHeight
+                ld d,a
+                ld a,c
+                cp d
+                jr c,.hit
+                ld a,(BirdY)
+                add a,10
+                ld c,a
+                ld a,(ix+2)
+                ld d,a
+                ld a,(ix+3)
+                add a,d
+                ld d,a
+                ld a,c
+                cp d
+                jr nc,.hit
+.next:          pop de
+                pop bc
+                add ix,de
+                djnz .loop
+                ret
+.offLeft:       pop hl
+                jr .next
+.hit:           pop de
+                pop bc
+                jp CacheSetGameOver
 
 CacheCheckSpace:
                 ld a,127
@@ -83,6 +316,9 @@ CacheCheckSpace:
                 ret
 
 CacheUpdateBirdState:
+                ld a,(GemeOver)
+                and a
+                ret nz
                 in a,(RGMOD)
                 and 1
                 ret z
@@ -118,7 +354,13 @@ CacheDrawBird:
                 out (EmmWin.P3),a
                 ld hl,#c000
                 ld bc,204
-                ld a,(CacheUpdateBirdState.state)
+                ld a,(GemeOver)
+                and a
+                jr z,.normalState
+                ld a,3
+                jr .stateReady
+.normalState:   ld a,(CacheUpdateBirdState.state)
+.stateReady:
                 and a
                 jr z,.null
 .addAdr:        add hl,bc
@@ -312,6 +554,7 @@ CacheDrawTubes:
                 ld (iy+2),a
                 ld a,(ix+3)
                 ld (iy+3),a
+                ld (CacheDrawTubeGap),a
                 ld a,(ix+2)
                 call CacheDrawTube
                 add ix,de
@@ -382,8 +625,29 @@ CacheAddScore:
                 ld hl,(Score)
                 inc hl
                 ld (Score),hl
+                call CacheUpdateHighScore
                 call CacheUpdateBiomeParams
                 pop hl
+                pop af
+                ret
+
+CacheUpdateHighScore:
+                push af
+                push de
+                push hl
+                ld hl,(Score)
+                ld de,(HighScore)
+                ld a,h
+                cp d
+                jr c,.end
+                jr nz,.store
+                ld a,l
+                cp e
+                jr c,.end
+                jr z,.end
+.store:         ld (HighScore),hl
+.end:           pop hl
+                pop de
                 pop af
                 ret
 
@@ -411,25 +675,25 @@ CacheUpdateBiomeParams:
                 jr .setGap
 .villageDay:    ld a,BIOME_VILLAGE_DAY
                 ld (CurrentBiome),a
-                ld a,104
+                ld a,100
                 ld (CurrentTubeInterval),a
                 ld a,68
                 jr .setGap
 .cityNight:     ld a,BIOME_CITY_NIGHT
                 ld (CurrentBiome),a
-                ld a,112
+                ld a,104
                 ld (CurrentTubeInterval),a
                 ld a,72
                 jr .setGap
 .cityEvening:   ld a,BIOME_CITY_EVENING
                 ld (CurrentBiome),a
-                ld a,120
+                ld a,108
                 ld (CurrentTubeInterval),a
                 ld a,76
                 jr .setGap
 .cityDay:       ld a,BIOME_CITY_DAY
                 ld (CurrentBiome),a
-                ld a,128
+                ld a,112
                 ld (CurrentTubeInterval),a
                 ld a,80
 .setGap:        ld (CurrentTubeGap),a
@@ -503,6 +767,10 @@ CacheGetSpawnDistance:
 .extra24:       ld b,24
 .addBase:       call CacheGetIntervalJitter
                 add a,b
+                cp 128
+                jr c,.store
+                ld a,127
+.store:
                 ld e,a
                 ld d,0
                 pop af
@@ -584,10 +852,15 @@ CacheSelectTubeYByIndex:
                 ret
 
 CacheRandom:
+                ld a,r
+                ld b,a
                 ld a,(RandomSeed)
                 rrca
-                jr nc,.store
+                jr nc,.mix
                 xor #b8
+.mix:           xor b
+                jr nz,.store
+                ld a,#a7
 .store:         ld (RandomSeed),a
                 ret
 
@@ -735,7 +1008,9 @@ CacheDrawTube:
                 pop af
                 pop de
                 pop hl
-                add a,80
+                ld b,a
+                ld a,(CacheDrawTubeGap)
+                add a,b
                 ld bc,RedTubeUp
                 add hl,bc
                 push de
@@ -809,7 +1084,10 @@ CacheDrawTube:
                 pop af
                 push de
                 push af
-                add a,80+TubeHeadHeight
+                ld b,a
+                ld a,(CacheDrawTubeGap)
+                add a,b
+                add a,TubeHeadHeight
                 push af
                 ld b,a
                 ld a,220
@@ -820,7 +1098,9 @@ CacheDrawTube:
                 call CacheDrawTubeBody
                 pop af
                 pop de
-                add a,80
+                ld b,a
+                ld a,(CacheDrawTubeGap)
+                add a,b
                 ld hl,RedTubeUp
                 call CacheDrawTubeHead
 .exit:          pop af
@@ -885,14 +1165,17 @@ CacheDrawScore:
                 in a,(EmmWin.P3)
                 push af
                 call CacheClearScoreRect
+                call CacheClearHighScoreRect
                 ld a,#5c
                 out (EmmWin.P1),a
                 ld a,(MemoryBuffer.memUi)
                 out (EmmWin.P3),a
                 ld hl,(Score)
                 ld (CacheScoreValue),hl
-                ld a,4
-                ld (CacheScoreX),a
+                ld hl,4
+                ld (CacheScoreX),hl
+                ld a,237
+                ld (CacheScoreY),a
                 xor a
                 ld (CacheScorePrinted),a
                 ld (CacheScoreForceDraw),a
@@ -908,6 +1191,27 @@ CacheDrawScore:
                 ld (CacheScoreForceDraw),a
                 ld de,1
                 call CacheDrawScorePlace
+                ld hl,(HighScore)
+                ld (CacheScoreValue),hl
+                call CacheSetFieldHighScoreX
+                ld a,237
+                ld (CacheScoreY),a
+                xor a
+                ld (CacheScorePrinted),a
+                ld (CacheScoreForceDraw),a
+                ld de,10000
+                call CacheDrawScorePlace
+                ld de,1000
+                call CacheDrawScorePlace
+                ld de,100
+                call CacheDrawScorePlace
+                ld de,10
+                call CacheDrawScorePlace
+                ld a,1
+                ld (CacheScoreForceDraw),a
+                ld de,1
+                call CacheDrawScorePlace
+                call CacheDrawFlappyBirdFooter
                 pop af
                 out (EmmWin.P3),a
                 pop af
@@ -935,6 +1239,66 @@ CacheClearScoreRect:
                 ld (hl),a
                 ld b,b
                 djnz .rowLoop
+                ld a,#c0
+                out (Y_PORT),a
+                ret
+
+CacheClearHighScoreRect:
+                ld a,#50
+                out (EmmWin.P1),a
+                ld hl,#4000+272
+                in a,(RGMOD)
+                and 1
+                jr nz,.firstpg
+                ld hl,#4140+272
+.firstpg:       ld e,237
+                ld b,10
+.rowLoop:       ld a,e
+                out (Y_PORT),a
+                inc e
+                di
+                ld d,d
+                ld a,40
+                ld c,c
+                ld a,2
+                ld (hl),a
+                ld b,b
+                djnz .rowLoop
+                ld a,#c0
+                out (Y_PORT),a
+                ret
+
+CacheSetFieldHighScoreX:
+                ld bc,304
+                push hl
+                ld de,10
+                and a
+                sbc hl,de
+                pop hl
+                jr c,.store
+                ld bc,296
+                push hl
+                ld de,100
+                and a
+                sbc hl,de
+                pop hl
+                jr c,.store
+                ld bc,288
+                push hl
+                ld de,1000
+                and a
+                sbc hl,de
+                pop hl
+                jr c,.store
+                ld bc,280
+                push hl
+                ld de,10000
+                and a
+                sbc hl,de
+                pop hl
+                jr c,.store
+                ld bc,272
+.store:         ld (CacheScoreX),bc
                 ret
 
 CacheDrawScorePlace:
@@ -961,9 +1325,7 @@ CacheDrawScorePlace:
 
 CacheDrawSmallDigit:
                 ld (CacheScoreDigit),a
-                ld a,(CacheScoreX)
-                ld l,a
-                ld h,0
+                ld hl,(CacheScoreX)
                 in a,(RGMOD)
                 and 1
                 ld de,#4000
@@ -979,11 +1341,12 @@ CacheDrawSmallDigit:
 .sourceLoop:    add hl,bc
                 dec a
                 jr nz,.sourceLoop
-.sourceReady:   ld a,237
+.sourceReady:   ld a,(CacheScoreY)
                 call CacheDrawSmallDigitSprite
-                ld a,(CacheScoreX)
-                add a,8
-                ld (CacheScoreX),a
+                ld hl,(CacheScoreX)
+                ld de,8
+                add hl,de
+                ld (CacheScoreX),hl
                 ret
 
 CacheDrawSmallDigitSprite:
@@ -1008,6 +1371,583 @@ CacheDrawSmallDigitSprite:
                 pop de
                 pop bc
                 djnz .rowLoop
+                ret
+
+CacheDrawReadyCountdown:
+                in a,(EmmWin.P1)
+                push af
+                in a,(EmmWin.P3)
+                push af
+                ld a,#5c
+                out (EmmWin.P1),a
+                ld a,(MemoryBuffer.memUi)
+                out (EmmWin.P3),a
+                call CacheGetReadyDigit
+                ld hl,UiBigDigits
+                and a
+                jr z,.sourceReady
+                ld bc,320
+.sourceLoop:    add hl,bc
+                dec a
+                jr nz,.sourceLoop
+.sourceReady:   ld de,#4000+152
+                in a,(RGMOD)
+                and 1
+                jr nz,.firstpg
+                ld de,#4140+152
+.firstpg:       ld a,144
+                call CacheDrawBigDigitSprite
+                pop af
+                out (EmmWin.P3),a
+                pop af
+                out (EmmWin.P1),a
+                ret
+
+CacheGetReadyDigit:
+                ld a,(ReadyCounter)
+                cp 113
+                jr nc,.three
+                cp 76
+                jr nc,.two
+                cp 39
+                jr nc,.one
+                xor a
+                ret
+.one:           ld a,1
+                ret
+.two:           ld a,2
+                ret
+.three:         ld a,3
+                ret
+
+CacheDrawBigDigitSprite:
+                ld (.y),a
+                ld b,20
+.rowLoop:       ld a,0
+.y:             equ $-1
+                out (Y_PORT),a
+                inc a
+                ld (.y),a
+                push bc
+                push de
+                push hl
+                di
+                ld d,d
+                ld a,16
+                ld l,l
+                ld a,(hl)
+                ld (de),a
+                ld b,b
+                pop hl
+                ld bc,16
+                add hl,bc
+                pop de
+                pop bc
+                djnz .rowLoop
+                ld a,#c0
+                out (Y_PORT),a
+                ret
+
+CacheDrawGetReadyTitle:
+                ld hl,UiGetReady
+                ld a,112
+                jr CacheDrawTitle
+
+CacheDrawGameOverTitle:
+                ld hl,UiGameOver
+                ld a,80
+CacheDrawTitle:
+                ld (.titleY),a
+                in a,(EmmWin.P1)
+                push af
+                in a,(EmmWin.P3)
+                push af
+                ld a,#5c
+                out (EmmWin.P1),a
+                ld a,(MemoryBuffer.memUi)
+                out (EmmWin.P3),a
+                ld de,#4000+112
+                in a,(RGMOD)
+                and 1
+                jr nz,.firstpg
+                ld de,#4140+112
+.firstpg:       ld b,25
+                ld a,0
+.titleY:        equ $-1
+.rowLoop:       out (Y_PORT),a
+                inc a
+                push af
+                push bc
+                push de
+                di
+                ld d,d
+                ld a,96
+                ld l,l
+                ld a,(hl)
+                ld (de),a
+                ld b,b
+                pop de
+                ld bc,96
+                add hl,bc
+                pop bc
+                pop af
+                djnz .rowLoop
+                pop af
+                out (EmmWin.P3),a
+                pop af
+                out (EmmWin.P1),a
+                ret
+
+CacheDrawFlappyBirdFooter:
+                in a,(EmmWin.P1)
+                push af
+                in a,(EmmWin.P3)
+                push af
+                ld a,#5c
+                out (EmmWin.P1),a
+                ld a,(MemoryBuffer.memUi)
+                out (EmmWin.P3),a
+                ld hl,UiFlappyBird
+                ld de,#4000+112
+                in a,(RGMOD)
+                and 1
+                jr nz,.firstpg
+                ld de,#4140+112
+.firstpg:       ld b,25
+                ld a,231
+.rowLoop:       out (Y_PORT),a
+                inc a
+                push af
+                push bc
+                push de
+                di
+                ld d,d
+                ld a,96
+                ld l,l
+                ld a,(hl)
+                ld (de),a
+                ld b,b
+                pop de
+                ld bc,96
+                add hl,bc
+                pop bc
+                pop af
+                djnz .rowLoop
+                ld a,#c0
+                out (Y_PORT),a
+                pop af
+                out (EmmWin.P3),a
+                pop af
+                out (EmmWin.P1),a
+                ret
+
+CacheDrawGameOverPanel:
+                call CacheDrawGameOverPanelFrame
+                call CacheDrawGameOverMedal
+                call CacheDrawGameOverNumbers
+                ret
+
+CacheDrawGameOverPanelFrame:
+                in a,(EmmWin.P1)
+                push af
+                in a,(EmmWin.P3)
+                push af
+                ld a,#5c
+                out (EmmWin.P1),a
+                ld a,(MemoryBuffer.memGameOverPanel)
+                out (EmmWin.P3),a
+                ld hl,GameOverPanel
+                ld de,#4000+104
+                in a,(RGMOD)
+                and 1
+                jr nz,.firstpg
+                ld de,#4140+104
+.firstpg:       ld b,57
+                ld a,112
+.rowLoop:       out (Y_PORT),a
+                inc a
+                push af
+                push bc
+                push de
+                di
+                ld d,d
+                ld a,113
+                ld l,l
+                ld a,(hl)
+                ld (de),a
+                ld b,b
+                pop de
+                ld bc,113
+                add hl,bc
+                pop bc
+                pop af
+                djnz .rowLoop
+                ld a,#c0
+                out (Y_PORT),a
+                pop af
+                out (EmmWin.P3),a
+                pop af
+                out (EmmWin.P1),a
+                ret
+
+CacheDrawGameOverMedal:
+                call CacheSelectMedal
+                cp #ff
+                ret z
+                in a,(EmmWin.P1)
+                push af
+                in a,(EmmWin.P3)
+                push af
+                ld a,#5c
+                out (EmmWin.P1),a
+                ld a,(MemoryBuffer.memUi)
+                out (EmmWin.P3),a
+                call CacheSelectMedal
+                ld hl,UiCoins
+                and a
+                jr z,.sourceReady
+                ld bc,24*24
+.sourceLoop:    add hl,bc
+                dec a
+                jr nz,.sourceLoop
+.sourceReady:   ld de,#4000+116
+                in a,(RGMOD)
+                and 1
+                jr nz,.firstpg
+                ld de,#4140+116
+.firstpg:       ld b,24
+                ld a,132
+.rowLoop:       out (Y_PORT),a
+                inc a
+                push af
+                push bc
+                push de
+                push hl
+                di
+                ld d,d
+                ld a,24
+                ld l,l
+                ld a,(hl)
+                ld (de),a
+                ld b,b
+                pop hl
+                ld bc,24
+                add hl,bc
+                pop de
+                pop bc
+                pop af
+                djnz .rowLoop
+                ld a,#c0
+                out (Y_PORT),a
+                pop af
+                out (EmmWin.P3),a
+                pop af
+                out (EmmWin.P1),a
+                ret
+
+CacheSelectMedal:
+                ld hl,(Score)
+                ld a,h
+                and a
+                jr nz,.platinum
+                ld a,l
+                cp 100
+                jr nc,.platinum
+                cp 50
+                jr nc,.gold
+                cp 25
+                jr nc,.silver
+                cp 10
+                jr nc,.bronze
+                ld a,#ff
+                ret
+.bronze:        xor a
+                ret
+.silver:        ld a,1
+                ret
+.gold:          ld a,2
+                ret
+.platinum:      ld a,3
+                ret
+
+CacheDrawGameOverNumbers:
+                in a,(EmmWin.P1)
+                push af
+                in a,(EmmWin.P3)
+                push af
+                ld a,#5c
+                out (EmmWin.P1),a
+                ld a,(MemoryBuffer.memUi)
+                out (EmmWin.P3),a
+                ld hl,(Score)
+                ld (CacheScoreValue),hl
+                call CacheSetPanelScoreX
+                ld a,130
+                ld (CacheScoreY),a
+                xor a
+                ld (CacheScorePrinted),a
+                ld (CacheScoreForceDraw),a
+                ld de,10000
+                call CacheDrawScorePlace
+                ld de,1000
+                call CacheDrawScorePlace
+                ld de,100
+                call CacheDrawScorePlace
+                ld de,10
+                call CacheDrawScorePlace
+                ld a,1
+                ld (CacheScoreForceDraw),a
+                ld de,1
+                call CacheDrawScorePlace
+                ld hl,(HighScore)
+                ld (CacheScoreValue),hl
+                call CacheSetPanelScoreX
+                ld a,151
+                ld (CacheScoreY),a
+                xor a
+                ld (CacheScorePrinted),a
+                ld (CacheScoreForceDraw),a
+                ld de,10000
+                call CacheDrawScorePlace
+                ld de,1000
+                call CacheDrawScorePlace
+                ld de,100
+                call CacheDrawScorePlace
+                ld de,10
+                call CacheDrawScorePlace
+                ld a,1
+                ld (CacheScoreForceDraw),a
+                ld de,1
+                call CacheDrawScorePlace
+                pop af
+                out (EmmWin.P3),a
+                pop af
+                out (EmmWin.P1),a
+                ret
+
+CacheSetPanelScoreX:
+                ld bc,200
+                push hl
+                ld de,10
+                and a
+                sbc hl,de
+                pop hl
+                jr c,.store
+                ld bc,192
+                push hl
+                ld de,100
+                and a
+                sbc hl,de
+                pop hl
+                jr c,.store
+                ld bc,184
+                push hl
+                ld de,1000
+                and a
+                sbc hl,de
+                pop hl
+                jr c,.store
+                ld bc,176
+                push hl
+                ld de,10000
+                and a
+                sbc hl,de
+                pop hl
+                jr c,.store
+                ld bc,168
+.store:         ld (CacheScoreX),bc
+                ret
+
+CacheRestoreReadyOverlay:
+                in a,(EmmWin.P3)
+                push af
+                ld a,#50
+                out (EmmWin.P3),a
+                ld hl,#c000+112
+                in a,(RGMOD)
+                and 1
+                jr nz,.firstpg
+                ld hl,#c140+112
+.firstpg:       ld a,112
+                ld b,25
+                ld c,96
+                call CacheRestoreOverlayRect
+                ld de,40
+                add hl,de
+                ld a,144
+                ld b,20
+                ld c,16
+                call CacheRestoreOverlayRect
+                pop af
+                out (EmmWin.P3),a
+                ret
+
+CacheClearReadyOverlaySky:
+                in a,(EmmWin.P1)
+                push af
+                ld a,#50
+                out (EmmWin.P1),a
+                in a,(RGMOD)
+                ld hl,#4000+112
+                and 1
+                jr nz,.firstTitle
+                ld hl,#4140+112
+.firstTitle:    ld a,112
+                ld b,25
+                ld c,0
+                ld e,96
+                call CacheClearSkyRect
+                in a,(RGMOD)
+                ld hl,#4000+152
+                and 1
+                jr nz,.firstDigit
+                ld hl,#4140+152
+.firstDigit:    ld a,144
+                ld b,20
+                ld c,0
+                ld e,16
+                call CacheClearSkyRect
+                pop af
+                out (EmmWin.P1),a
+                ret
+
+CacheClearSkyRect:
+                ex af,af'
+                ld a,e
+                ld (.width),a
+                ex af,af'
+.rowLoop:       out (Y_PORT),a
+                inc a
+                push af
+                push bc
+                push de
+                push hl
+                di
+                ld d,d
+                ld a,0
+.width:         equ $-1
+                ld c,c
+                ld a,c
+                ld (hl),a
+                ld b,b
+                pop hl
+                pop de
+                pop bc
+                pop af
+                djnz .rowLoop
+                ld a,#c0
+                out (Y_PORT),a
+                ret
+
+CacheRestoreTitlePages:
+                in a,(EmmWin.P3)
+                push af
+                ld a,#50
+                out (EmmWin.P3),a
+                ld hl,#c000+112
+                call .restorePage
+                ld hl,#c140+112
+                call .restorePage
+                ld hl,#c000+152
+                call .restoreDigit
+                ld hl,#c140+152
+                call .restoreDigit
+                pop af
+                out (EmmWin.P3),a
+                ret
+.restorePage:   ld b,25
+                ld c,96
+                ld a,112
+.restoreRect:   jp CacheRestoreOverlayRect
+.restoreDigit:  ld b,20
+                ld c,16
+                ld a,144
+                jr .restoreRect
+
+CacheRestoreOverlayRect:
+.rowLoop:       out (Y_PORT),a
+                inc a
+                push af
+                push bc
+                push hl
+                di
+                ld d,d
+                ld a,c
+                ld l,l
+                ld c,(hl)
+                ld (hl),c
+                ld b,b
+                pop hl
+                pop bc
+                pop af
+                djnz .rowLoop
+                ld a,#c0
+                out (Y_PORT),a
+                ret
+
+CacheClearPlayfieldPages:
+                in a,(EmmWin.P1)
+                push af
+                ld a,#50
+                out (EmmWin.P1),a
+                ld hl,#4000
+                call .clearPage
+                ld hl,#4140
+                call .clearPage
+                pop af
+                out (EmmWin.P1),a
+                ret
+.clearPage:     push hl
+                ld b,150
+                ld c,0
+                ld e,0
+                call .clearRows
+                pop hl
+                push hl
+                ld b,70
+                ld c,1
+                ld e,150
+                call .clearRows
+                pop hl
+                ld b,36
+                ld c,2
+                ld e,220
+.clearRows:
+.rowLoop:       ld a,e
+                out (Y_PORT),a
+                inc e
+                push de
+                push bc
+                push hl
+                di
+                ld d,d
+                ld a,120
+                ld c,c
+                ld a,c
+                ld (hl),a
+                ld b,b
+                ld de,120
+                add hl,de
+                ld d,d
+                ld a,120
+                ld c,c
+                ld a,c
+                ld (hl),a
+                ld b,b
+                ld de,120
+                add hl,de
+                ld d,d
+                ld a,80
+                ld c,c
+                ld a,c
+                ld (hl),a
+                ld b,b
+                pop hl
+                pop bc
+                pop de
+                djnz .rowLoop
+                ld a,#c0
+                out (Y_PORT),a
                 ret
 
 CacheRestoreRect:

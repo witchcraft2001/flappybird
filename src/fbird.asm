@@ -719,9 +719,11 @@ MemoryBuffer:
 .memBirds       db 0
 .memTubes       db 0
 .memUi          db 0
+.memGameOverPanel:
+                db 0
 .memMusic       db 0
                 db 0
-assetsBlocks    db 6
+assetsBlocks    db 7
 
 AssetsDirName   db "ASSETS",0
 city            db "city.bin",0
@@ -729,6 +731,7 @@ way             db "way.bin",0
 birds           db "birds.bin",0
 tubes           db "tubes.bin",0
 ui              db "ui.bin",0
+gameOverPanel   db "gopanel.bin",0
 music           db "music.bin",0
 MemoryDescriptor:
                 db 0
@@ -740,6 +743,7 @@ UiHand:         equ UiCoins+24*24*4
 UiGetReady:     equ UiHand+16*18
 UiGameOver:     equ UiGetReady+96*25
 UiFlappyBird:   equ UiGameOver+96*25
+GameOverPanel:  equ #C000
 
 ;Страницы, которые были открыты при запуске программы
 Pages:
@@ -757,6 +761,13 @@ Page3:          db 0
 ; .x:             dw 0
 
 GemeOver:       db 0
+GameOverWaitRelease:
+                db 0
+GameOverRestartDelay:
+                db 0
+ReadyCounter:   db 150
+ReadyCleanupCounter:
+                db 0
 BirdY:          db 100
 BirdFirstY:     db #ff
 BirdSecondY:    db #ff
@@ -768,9 +779,11 @@ BIOME_VILLAGE_DAY   equ 3
 BIOME_VILLAGE_NIGHT equ 4
 
 Score:          dw 0
+HighScore:      dw 0
 CacheScoreValue:
                 dw 0
-CacheScoreX:    db 0
+CacheScoreX:    dw 0
+CacheScoreY:    db 0
 CacheScoreDigit:
                 db 0
 CacheScorePrinted:
@@ -779,11 +792,30 @@ CacheScoreForceDraw:
                 db 0
 CurrentBiome:   db BIOME_CITY_DAY
 CurrentTubeInterval:
-                db 128
+                db 112
 CurrentTubeGap:
+                db 80
+CacheDrawTubeGap:
                 db 80
 RandomSeed:     db #5a
 TubeYIndex:     db 0
+
+InitialTubes:
+                dw 100
+                db 70
+                db 80
+
+                dw 228
+                db 30
+                db 80
+
+                dw 356
+                db 110
+                db 80
+
+                dw 484
+                db 90
+                db 80
 
 Tubes:
                 dw 100
@@ -808,26 +840,26 @@ Tubes0          ds TUBES_COUNT*TUBE_ENTRY_SIZE,0
 Tubes1          ds TUBES_COUNT*TUBE_ENTRY_SIZE,0
 
 TubeYCityDay:
-                db 56,120,64,112,70,104,84,98
+                db 44,124,54,114,66,104,78,92
 TubeYCityEvening:
-                db 48,118,58,108,66,104,78,86
+                db 38,128,48,118,60,108,72,94
 TubeYCityNight:
-                db 42,124,52,116,60,106,82,96
+                db 34,132,44,122,56,112,70,96
 TubeYVillageDay:
-                db 50,122,60,114,68,108,80,88
+                db 40,130,50,120,62,110,76,96
 TubeYVillageNight:
-                db 44,126,54,118,62,104,84,94
+                db 32,134,42,124,54,114,72,98
 
 TubeIntervalCityDay:
-                db 128,136,120,128
+                db 112,108,104,100
 TubeIntervalCityEvening:
-                db 120,128,112,120
+                db 108,104,100,96
 TubeIntervalCityNight:
-                db 112,120,104,112
+                db 104,100,96,92
 TubeIntervalVillageDay:
-                db 104,112,96,104
+                db 100,96,92,88
 TubeIntervalVillageNight:
-                db 96,104,88,96
+                db 96,92,88,84
 
 InitRenderCache:
                 call OpenCacheWindow
@@ -836,6 +868,10 @@ InitRenderCache:
                 ld bc,CacheRenderCodeStoredEnd-CacheRenderCodeStored
                 ldir
                 call CloseCacheWindow
+                ld a,r
+                xor #5a
+                or 1
+                ld (RandomSeed),a
                 ei
                 ret
 
