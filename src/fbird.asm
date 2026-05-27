@@ -649,13 +649,15 @@ DrawTubes:      ld ix,Tubes
                 jr z,.firstpg
                 ld iy,Tubes0
 .firstpg:       ld b,TUBES_COUNT
-                ld de,3
+                ld de,TUBE_ENTRY_SIZE
 .loop:          ld l,(ix+0)
                 ld h,(ix+1)
                 ld (iy+0),l
                 ld (iy+1),h
                 ld a,(ix+2)
                 ld (iy+2),a
+                ld a,(ix+3)
+                ld (iy+3),a
                 call DrawTube
                 add ix,de
                 add iy,de
@@ -668,7 +670,7 @@ RestoreTubes:   in a,(RGMOD)
                 jr z,.firstpg
                 ld ix,Tubes0
 .firstpg:       ld b,TUBES_COUNT
-                ld de,3
+                ld de,TUBE_ENTRY_SIZE
 .loop:          ld l,(ix+0)
                 ld h,(ix+1)
                 ld a,(ix+2)
@@ -680,7 +682,7 @@ RestoreTubes:   in a,(RGMOD)
 
 UpdateTubes:    ld ix,Tubes
                 ld b,TUBES_COUNT
-                ld de,3
+                ld de,TUBE_ENTRY_SIZE
 .loop:          call UpdateTube
                 add ix,de
                 djnz .loop
@@ -1098,19 +1100,64 @@ BirdY:          db 100
 BirdFirstY:     db #ff
 BirdSecondY:    db #ff
 
+BIOME_CITY_DAY      equ 0
+BIOME_CITY_EVENING  equ 1
+BIOME_CITY_NIGHT    equ 2
+BIOME_VILLAGE_DAY   equ 3
+BIOME_VILLAGE_NIGHT equ 4
+
+Score:          dw 0
+CurrentBiome:   db BIOME_CITY_DAY
+CurrentTubeInterval:
+                db 128
+CurrentTubeGap:
+                db 80
+RandomSeed:     db #5a
+TubeYIndex:     db 0
+
 Tubes:
                 dw 100
                 db 70
+                db 80
 
-                dw 220
+                dw 228
                 db 30
+                db 80
 
-                dw 319
+                dw 356
                 db 110
+                db 80
 
-TUBES_COUNT     equ 3
-Tubes0          ds TUBES_COUNT*3,0
-Tubes1          ds TUBES_COUNT*3,0
+                dw 484
+                db 90
+                db 80
+
+TUBE_ENTRY_SIZE equ 4
+TUBES_COUNT     equ 4
+Tubes0          ds TUBES_COUNT*TUBE_ENTRY_SIZE,0
+Tubes1          ds TUBES_COUNT*TUBE_ENTRY_SIZE,0
+
+TubeYCityDay:
+                db 56,70,84,98,112,64,92,120
+TubeYCityEvening:
+                db 48,66,86,104,118,58,78,108
+TubeYCityNight:
+                db 42,60,82,106,124,52,96,116
+TubeYVillageDay:
+                db 50,68,88,108,122,60,80,114
+TubeYVillageNight:
+                db 44,62,84,104,126,54,94,118
+
+TubeIntervalCityDay:
+                db 128,136,120,128
+TubeIntervalCityEvening:
+                db 120,128,112,120
+TubeIntervalCityNight:
+                db 112,120,104,112
+TubeIntervalVillageDay:
+                db 104,112,96,104
+TubeIntervalVillageNight:
+                db 96,104,88,96
 
 InitRenderCache:
                 call OpenCacheWindow
@@ -1124,9 +1171,7 @@ InitRenderCache:
 
 RunRenderCache:
                 call OpenCacheWindow
-                ei
                 call CacheRenderFrame
-                di
                 call CloseCacheWindow
                 ei
                 ret

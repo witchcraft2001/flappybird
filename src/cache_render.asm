@@ -205,7 +205,7 @@ CacheDrawCity:
                 ld a,(hl)
                 ld (de),a
                 ld b,b
-                ei
+                ; keep IRQs disabled while WIN1 is mapped to VRAM
                 ld bc,276
                 add hl,bc
                 pop af
@@ -281,7 +281,7 @@ CacheDrawWay:
                 ld a,(hl)
                 ld (de),a
                 ld b,b
-                ei
+                ; keep IRQs disabled while WIN1 is mapped to VRAM
                 ld bc,140
                 add hl,bc
                 pop af
@@ -302,13 +302,15 @@ CacheDrawTubes:
                 jr z,.firstpg
                 ld iy,Tubes0
 .firstpg:       ld b,TUBES_COUNT
-                ld de,3
+                ld de,TUBE_ENTRY_SIZE
 .loop:          ld l,(ix+0)
                 ld h,(ix+1)
                 ld (iy+0),l
                 ld (iy+1),h
                 ld a,(ix+2)
                 ld (iy+2),a
+                ld a,(ix+3)
+                ld (iy+3),a
                 call CacheDrawTube
                 add ix,de
                 add iy,de
@@ -322,7 +324,7 @@ CacheRestoreTubes:
                 jr z,.firstpg
                 ld ix,Tubes0
 .firstpg:       ld b,TUBES_COUNT
-                ld de,3
+                ld de,TUBE_ENTRY_SIZE
 .loop:          ld l,(ix+0)
                 ld h,(ix+1)
                 ld a,(ix+2)
@@ -335,19 +337,27 @@ CacheRestoreTubes:
 CacheUpdateTubes:
                 ld ix,Tubes
                 ld b,TUBES_COUNT
-                ld de,3
+                ld de,TUBE_ENTRY_SIZE
 .loop:          call CacheUpdateTube
                 add ix,de
                 djnz .loop
                 ret
 
 CacheUpdateTube:
+                push bc
                 push de
                 ld l,(ix+0)
                 ld h,(ix+1)
                 dec hl
                 ld (ix+0),l
                 ld (ix+1),h
+                ld a,h
+                cp #ff
+                jr nz,.checkOffscreen
+                ld a,l
+                cp #f6
+                call z,CacheAddScore
+.checkOffscreen:
                 bit 7,h
                 jr z,.end
                 ld de,TubeWidth
@@ -355,33 +365,238 @@ CacheUpdateTube:
                 add hl,de
                 ld a,h
                 or l
-                jr nz,.end
-                ld hl,319
+                jr z,.spawn
+                bit 7,h
+                jr z,.end
+.spawn:
+                call CacheSpawnTube
+.end:           pop de
+                pop bc
+                ret
+
+CacheAddScore:
+                push af
+                push hl
+                ld hl,(Score)
+                inc hl
+                ld (Score),hl
+                call CacheUpdateBiomeParams
+                pop hl
+                pop af
+                ret
+
+CacheUpdateBiomeParams:
+                push af
+                push hl
+                ld hl,(Score)
+                ld a,h
+                and a
+                jr nz,.villageNight
+                ld a,l
+                cp 10
+                jr c,.cityDay
+                cp 25
+                jr c,.cityEvening
+                cp 50
+                jr c,.cityNight
+                cp 80
+                jr c,.villageDay
+.villageNight:  ld a,BIOME_VILLAGE_NIGHT
+                ld (CurrentBiome),a
+                ld a,96
+                ld (CurrentTubeInterval),a
+                ld a,64
+                jr .setGap
+.villageDay:    ld a,BIOME_VILLAGE_DAY
+                ld (CurrentBiome),a
+                ld a,104
+                ld (CurrentTubeInterval),a
+                ld a,68
+                jr .setGap
+.cityNight:     ld a,BIOME_CITY_NIGHT
+                ld (CurrentBiome),a
+                ld a,112
+                ld (CurrentTubeInterval),a
+                ld a,72
+                jr .setGap
+.cityEvening:   ld a,BIOME_CITY_EVENING
+                ld (CurrentBiome),a
+                ld a,120
+                ld (CurrentTubeInterval),a
+                ld a,76
+                jr .setGap
+.cityDay:       ld a,BIOME_CITY_DAY
+                ld (CurrentBiome),a
+                ld a,128
+                ld (CurrentTubeInterval),a
+                ld a,80
+.setGap:        ld (CurrentTubeGap),a
+                pop hl
+                pop af
+                ret
+
+CacheSpawnTube:
+                push ix
+                call CacheFindRightmostTube
+                ld b,c
+                push hl
+                call CacheSelectTubeY
+                ld c,a
+                call CacheGetSpawnDistance
+                pop hl
+                add hl,de
+                pop ix
                 ld (ix+0),l
                 ld (ix+1),h
-.end:           pop de
+                ld (ix+2),c
+                ld a,(CurrentTubeGap)
+                ld (ix+3),a
+                ret
+
+CacheFindRightmostTube:
+                ld hl,319
+                ld c,70
+                ld ix,Tubes
+                ld b,TUBES_COUNT
+                ld de,TUBE_ENTRY_SIZE
+.loop:          push de
+                ld e,(ix+0)
+                ld d,(ix+1)
+                bit 7,d
+                jr nz,.next
+                push hl
+                push de
+                ex de,hl
+                and a
+                sbc hl,de
+                pop de
+                pop hl
+                jr c,.next
+                jr z,.next
+                ex de,hl
+                ld c,(ix+2)
+.next:          pop de
+                add ix,de
+                djnz .loop
+                ret
+
+CacheGetSpawnDistance:
+                push af
+                ld a,c
+                sub b
+                jr nc,.absReady
+                neg
+.absReady:      cp 64
+                jr nc,.extra24
+                cp 48
+                jr nc,.extra16
+                cp 32
+                jr nc,.extra8
+                ld b,0
+                jr .addBase
+.extra8:        ld b,8
+                jr .addBase
+.extra16:       ld b,16
+                jr .addBase
+.extra24:       ld b,24
+.addBase:       call CacheGetIntervalJitter
+                add a,b
+                ld e,a
+                ld d,0
+                pop af
+                ret
+
+CacheGetIntervalJitter:
+                call CacheRandom
+                and 3
+                ld e,a
+                ld d,0
+                ld a,(CurrentBiome)
+                cp BIOME_CITY_EVENING
+                jr z,.cityEvening
+                cp BIOME_CITY_NIGHT
+                jr z,.cityNight
+                cp BIOME_VILLAGE_DAY
+                jr z,.villageDay
+                cp BIOME_VILLAGE_NIGHT
+                jr z,.villageNight
+                ld hl,TubeIntervalCityDay
+                jr .pick
+.cityEvening:   ld hl,TubeIntervalCityEvening
+                jr .pick
+.cityNight:     ld hl,TubeIntervalCityNight
+                jr .pick
+.villageDay:    ld hl,TubeIntervalVillageDay
+                jr .pick
+.villageNight:  ld hl,TubeIntervalVillageNight
+.pick:          add hl,de
+                ld a,(hl)
+                ret
+
+CacheSelectTubeY:
+                ld a,(TubeYIndex)
+                inc a
+                and 7
+                ld (TubeYIndex),a
+                ld e,a
+                ld d,0
+                ld a,(CurrentBiome)
+                cp BIOME_CITY_EVENING
+                jr z,.cityEvening
+                cp BIOME_CITY_NIGHT
+                jr z,.cityNight
+                cp BIOME_VILLAGE_DAY
+                jr z,.villageDay
+                cp BIOME_VILLAGE_NIGHT
+                jr z,.villageNight
+                ld hl,TubeYCityDay
+                jr .pick
+.cityEvening:   ld hl,TubeYCityEvening
+                jr .pick
+.cityNight:     ld hl,TubeYCityNight
+                jr .pick
+.villageDay:    ld hl,TubeYVillageDay
+                jr .pick
+.villageNight:  ld hl,TubeYVillageNight
+.pick:          add hl,de
+                ld a,(hl)
+                ret
+
+CacheRandom:
+                ld a,(RandomSeed)
+                rrca
+                jr nc,.store
+                xor #b8
+.store:         ld (RandomSeed),a
                 ret
 
 CacheRestoreTube:
                 push bc
                 push de
-                ld de,TubeWidth-TubeWidthRestored
-                add hl,de
                 in a,(EmmWin.P3)
                 push af
                 ld a,#50
                 out (EmmWin.P3),a
                 push hl
-                ld a,h
-                and 254
-                jr z,.positive
+                bit 7,h
+                jr z,.notLeftClipped
                 pop de
                 and a
-                ld hl,TubeWidthRestored
+                ld hl,TubeWidth
                 add hl,de
+                ld a,h
+                or l
+                jp z,.exit
+                bit 7,h
+                jp nz,.exit
                 ld b,l
                 ld hl,0
                 jr .restore
+.notLeftClipped:
+                pop hl
+                ld de,TubeWidth-TubeWidthRestored
+                add hl,de
+                push hl
 .positive:      ld bc,320
                 push hl
                 and a
@@ -403,6 +618,9 @@ CacheRestoreTube:
                 jr .sizeSet
 .full:          pop hl
 .sizeSet:       ld b,l
+                ld a,b
+                and a
+                jp z,.skipRestoreVisible
                 pop hl
 .restore:       in a,(RGMOD)
                 ld de,#c000
@@ -431,9 +649,11 @@ CacheRestoreTube:
                 out (EmmWin.P3),a
                 pop de
                 pop bc
-                ei
                 ret
 .skip:          pop de
+                jp .exit
+.skipRestoreVisible:
+                pop hl
                 jp .exit
 
 CacheDrawTube:
@@ -447,14 +667,18 @@ CacheDrawTube:
                 ld a,#5c
                 out (EmmWin.P1),a
                 push hl
-                ld a,h
-                and 254
+                bit 7,h
                 jr z,.positive
                 pop de
                 push de
                 and a
                 ld hl,TubeWidth
                 add hl,de
+                ld a,h
+                or l
+                jp z,.skipNegative
+                bit 7,h
+                jp nz,.skipNegative
                 ld a,l
                 ld (CacheDrawTubeHead.len),a
                 pop de
@@ -509,7 +733,15 @@ CacheDrawTube:
                 ex af,af'
                 call CacheDrawTubeBody
                 jr .exit
-.positive:      ld bc,TubeWidth
+.positive:      ld de,320
+                push hl
+                and a
+                sbc hl,de
+                pop hl
+                jr c,.visible
+                pop hl
+                jr .exit
+.visible:       ld bc,TubeWidth
                 push bc
                 add hl,bc
                 ld de,320
@@ -524,6 +756,8 @@ CacheDrawTube:
                 jr .sizeSet
 .full:          pop hl
 .sizeSet:       ld a,l
+                and a
+                jr z,.skipVisible
                 ld (CacheDrawTubeHead.len),a
                 pop hl
                 in a,(RGMOD)
@@ -573,6 +807,10 @@ CacheDrawTube:
                 pop de
                 pop bc
                 ret
+.skipVisible:   pop hl
+                jr .exit
+.skipNegative:  pop de
+                jr .exit
 
 CacheDrawTubeBody:
                 ex af,af'
@@ -595,7 +833,6 @@ CacheDrawTubeBody:
                 inc de
                 dec c
                 jr nz,.loop
-                ei
                 ret
 
 CacheDrawTubeHead:
@@ -648,7 +885,6 @@ CacheRestoreRect:
                 djnz .loop
                 pop af
                 out (EmmWin.P3),a
-                ei
                 ret
 
 CacheRenderCodeEnd:
