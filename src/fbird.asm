@@ -718,18 +718,28 @@ MemoryBuffer:
 .memWay         db 0
 .memBirds       db 0
 .memTubes       db 0
+.memUi          db 0
 .memMusic       db 0
                 db 0
-assetsBlocks    db 5
+assetsBlocks    db 6
 
 AssetsDirName   db "ASSETS",0
 city            db "city.bin",0
 way             db "way.bin",0
 birds           db "birds.bin",0
 tubes           db "tubes.bin",0
+ui              db "ui.bin",0
 music           db "music.bin",0
 MemoryDescriptor:
                 db 0
+
+UiBigDigits:    equ #C000
+UiSmallDigits:  equ UiBigDigits+16*20*10
+UiCoins:        equ UiSmallDigits+8*10*10
+UiHand:         equ UiCoins+24*24*4
+UiGetReady:     equ UiHand+16*18
+UiGameOver:     equ UiGetReady+96*25
+UiFlappyBird:   equ UiGameOver+96*25
 
 ;Страницы, которые были открыты при запуске программы
 Pages:
@@ -758,6 +768,15 @@ BIOME_VILLAGE_DAY   equ 3
 BIOME_VILLAGE_NIGHT equ 4
 
 Score:          dw 0
+CacheScoreValue:
+                dw 0
+CacheScoreX:    db 0
+CacheScoreDigit:
+                db 0
+CacheScorePrinted:
+                db 0
+CacheScoreForceDraw:
+                db 0
 CurrentBiome:   db BIOME_CITY_DAY
 CurrentTubeInterval:
                 db 128
@@ -789,15 +808,15 @@ Tubes0          ds TUBES_COUNT*TUBE_ENTRY_SIZE,0
 Tubes1          ds TUBES_COUNT*TUBE_ENTRY_SIZE,0
 
 TubeYCityDay:
-                db 56,70,84,98,112,64,92,120
+                db 56,120,64,112,70,104,84,98
 TubeYCityEvening:
-                db 48,66,86,104,118,58,78,108
+                db 48,118,58,108,66,104,78,86
 TubeYCityNight:
-                db 42,60,82,106,124,52,96,116
+                db 42,124,52,116,60,106,82,96
 TubeYVillageDay:
-                db 50,68,88,108,122,60,80,114
+                db 50,122,60,114,68,108,80,88
 TubeYVillageNight:
-                db 44,62,84,104,126,54,94,118
+                db 44,126,54,118,62,104,84,94
 
 TubeIntervalCityDay:
                 db 128,136,120,128

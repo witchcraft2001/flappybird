@@ -11,6 +11,7 @@ CacheRenderFrame:
                 call CacheUpdateTubes
                 call CacheDrawTubes
                 call CacheDrawBird
+                call CacheDrawScore
                 ld a,1
                 ld (Im2Handler.needChangePage),a
                 call CacheUpdateBirdCoord
@@ -535,10 +536,29 @@ CacheGetIntervalJitter:
                 ret
 
 CacheSelectTubeY:
-                ld a,(TubeYIndex)
-                inc a
+                push bc
+                call CacheRandom
                 and 7
                 ld (TubeYIndex),a
+                ld c,a
+                call CacheSelectTubeYByIndex
+                ld c,a
+                ld a,c
+                sub b
+                jr nc,.absReady
+                neg
+.absReady:      cp 24
+                jr nc,.useSelected
+                ld a,(TubeYIndex)
+                add a,4
+                and 7
+                ld (TubeYIndex),a
+                call CacheSelectTubeYByIndex
+.useSelected:   pop bc
+                ret
+
+CacheSelectTubeYByIndex:
+                ld a,(TubeYIndex)
                 ld e,a
                 ld d,0
                 ld a,(CurrentBiome)
@@ -857,6 +877,137 @@ CacheDrawTubeHead:
                 ex af,af'
                 dec a
                 jr nz,.loop
+                ret
+
+CacheDrawScore:
+                in a,(EmmWin.P1)
+                push af
+                in a,(EmmWin.P3)
+                push af
+                call CacheClearScoreRect
+                ld a,#5c
+                out (EmmWin.P1),a
+                ld a,(MemoryBuffer.memUi)
+                out (EmmWin.P3),a
+                ld hl,(Score)
+                ld (CacheScoreValue),hl
+                ld a,4
+                ld (CacheScoreX),a
+                xor a
+                ld (CacheScorePrinted),a
+                ld (CacheScoreForceDraw),a
+                ld de,10000
+                call CacheDrawScorePlace
+                ld de,1000
+                call CacheDrawScorePlace
+                ld de,100
+                call CacheDrawScorePlace
+                ld de,10
+                call CacheDrawScorePlace
+                ld a,1
+                ld (CacheScoreForceDraw),a
+                ld de,1
+                call CacheDrawScorePlace
+                pop af
+                out (EmmWin.P3),a
+                pop af
+                out (EmmWin.P1),a
+                ret
+
+CacheClearScoreRect:
+                ld a,#50
+                out (EmmWin.P1),a
+                ld hl,#4000+4
+                in a,(RGMOD)
+                and 1
+                jr nz,.firstpg
+                ld hl,#4140+4
+.firstpg:       ld e,237
+                ld b,10
+.rowLoop:       ld a,e
+                out (Y_PORT),a
+                inc e
+                di
+                ld d,d
+                ld a,32
+                ld c,c
+                ld a,2
+                ld (hl),a
+                ld b,b
+                djnz .rowLoop
+                ret
+
+CacheDrawScorePlace:
+                ld c,0
+                ld hl,(CacheScoreValue)
+.subLoop:       and a
+                sbc hl,de
+                jr c,.subDone
+                inc c
+                jr .subLoop
+.subDone:       add hl,de
+                ld (CacheScoreValue),hl
+                ld a,(CacheScorePrinted)
+                or c
+                jr nz,.draw
+                ld a,(CacheScoreForceDraw)
+                and a
+                ret z
+.draw:          ld a,1
+                ld (CacheScorePrinted),a
+                ld a,c
+                call CacheDrawSmallDigit
+                ret
+
+CacheDrawSmallDigit:
+                ld (CacheScoreDigit),a
+                ld a,(CacheScoreX)
+                ld l,a
+                ld h,0
+                in a,(RGMOD)
+                and 1
+                ld de,#4000
+                jr nz,.firstpg
+                ld de,#4140
+.firstpg:       add hl,de
+                ex de,hl
+                ld a,(CacheScoreDigit)
+                ld hl,UiSmallDigits
+                and a
+                jr z,.sourceReady
+                ld bc,80
+.sourceLoop:    add hl,bc
+                dec a
+                jr nz,.sourceLoop
+.sourceReady:   ld a,237
+                call CacheDrawSmallDigitSprite
+                ld a,(CacheScoreX)
+                add a,8
+                ld (CacheScoreX),a
+                ret
+
+CacheDrawSmallDigitSprite:
+                ld (.y),a
+                ld b,10
+.rowLoop:       ld a,0
+.y:             equ $-1
+                out (Y_PORT),a
+                inc a
+                ld (.y),a
+                push bc
+                push de
+                ld c,8
+.colLoop:       ld a,(hl)
+                cp 255
+                jr z,.skipPixel
+                ld (de),a
+.skipPixel:     inc hl
+                inc de
+                dec c
+                jr nz,.colLoop
+                pop de
+                pop bc
+                djnz .rowLoop
                 ret
 
 CacheRestoreRect:

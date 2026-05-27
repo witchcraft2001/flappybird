@@ -21,9 +21,10 @@ resources: cut
 	cd $(ASSETS_DIR)/resources && $(PYTHON) ../../tools/resources.py ../res.txt
 	cat $(ASSETS_DIR)/resources/bird0.bin $(ASSETS_DIR)/resources/bird1.bin $(ASSETS_DIR)/resources/bird2.bin > $(ASSETS_DIR)/resources/birds.bin
 	cat $(ASSETS_DIR)/resources/tube0dn.bin $(ASSETS_DIR)/resources/tube0up.bin $(ASSETS_DIR)/resources/tube0md.bin $(ASSETS_DIR)/resources/tube1dn.bin $(ASSETS_DIR)/resources/tube1up.bin $(ASSETS_DIR)/resources/tube1md.bin > $(ASSETS_DIR)/resources/tubes.bin
+	cat $(ASSETS_DIR)/resources/big_digit*.bin $(ASSETS_DIR)/resources/small_digit*.bin $(ASSETS_DIR)/resources/coin*.bin $(ASSETS_DIR)/resources/ui_hand.bin $(ASSETS_DIR)/resources/title_get_ready.bin $(ASSETS_DIR)/resources/title_game_over.bin $(ASSETS_DIR)/resources/title_flappybird.bin > $(ASSETS_DIR)/resources/ui.bin
 	mkdir -p $(SRC_DIR)/assets
 	cp $(ASSETS_DIR)/resources/res_pal.asm $(SRC_DIR)/res_pal.asm
-	cp $(ASSETS_DIR)/resources/city.bin $(ASSETS_DIR)/resources/way.bin $(ASSETS_DIR)/resources/birds.bin $(ASSETS_DIR)/resources/tubes.bin $(SRC_DIR)/assets/
+	cp $(ASSETS_DIR)/resources/city.bin $(ASSETS_DIR)/resources/way.bin $(ASSETS_DIR)/resources/birds.bin $(ASSETS_DIR)/resources/tubes.bin $(ASSETS_DIR)/resources/ui.bin $(SRC_DIR)/assets/
 
 exe: resources
 	cd $(SRC_DIR) && $(SJASM) fbird.asm --lst=fbird.lst
