@@ -311,6 +311,7 @@ CacheDrawTubes:
                 ld (iy+2),a
                 ld a,(ix+3)
                 ld (iy+3),a
+                ld a,(ix+2)
                 call CacheDrawTube
                 add ix,de
                 add iy,de
