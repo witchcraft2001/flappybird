@@ -18,6 +18,7 @@ CacheRenderFrame:
                 call CacheUpdateCityPos
                 call CacheUpdateWayPos
                 call CacheRestoreBirdBackground
+                call CacheRestoreFieldMedalBackground
                 call CacheCleanupReadyOverlay
                 call CacheDrawCity
                 call CacheDrawWay
@@ -32,6 +33,7 @@ CacheRenderFrame:
 
 CacheRenderReady:
                 call CacheRestoreBirdBackground
+                call CacheRestoreFieldMedalBackground
                 call CacheDrawCity
                 call CacheDrawWay
                 call CacheRestoreTubes
@@ -46,6 +48,7 @@ CacheRenderReady:
 
 CacheRenderGameOver:
                 call CacheRestoreBirdBackground
+                call CacheRestoreFieldMedalBackground
                 call CacheDrawCity
                 call CacheDrawWay
                 call CacheRestoreTubes
@@ -171,6 +174,11 @@ CacheRestartGame:
                 ld a,#ff
                 ld (BirdFirstY),a
                 ld (BirdSecondY),a
+                ld (FieldMedalId),a
+                ld (FieldMedalFirstY),a
+                ld (FieldMedalSecondY),a
+                xor a
+                ld (FieldMedalAnim),a
                 ld a,150
                 ld (ReadyCounter),a
                 xor a
@@ -626,27 +634,39 @@ CacheAddScore:
                 ld hl,(Score)
                 inc hl
                 ld (Score),hl
-                call CacheCheckMedalSfx
+                call CacheCheckMedalAward
                 call CacheUpdateHighScore
                 call CacheUpdateBiomeParams
                 pop hl
                 pop af
                 ret
 
-CacheCheckMedalSfx:
+CacheCheckMedalAward:
                 ld a,h
                 and a
                 ret nz
                 ld a,l
                 cp 10
-                jr z,.play
+                jr z,.bronze
                 cp 25
-                jr z,.play
+                jr z,.silver
                 cp 50
-                jr z,.play
+                jr z,.gold
                 cp 100
                 ret nz
-.play:          jp SfxQueuePoint
+.platinum:      ld a,3
+                jr CacheStartFieldMedalAward
+.gold:          ld a,2
+                jr CacheStartFieldMedalAward
+.silver:        ld a,1
+                jr CacheStartFieldMedalAward
+.bronze:        xor a
+
+CacheStartFieldMedalAward:
+                ld (FieldMedalId),a
+                ld a,1
+                ld (FieldMedalAnim),a
+                ret
 
 CacheUpdateHighScore:
                 push af
@@ -1191,9 +1211,9 @@ CacheDrawScore:
                 out (EmmWin.P3),a
                 ld hl,(Score)
                 ld (CacheScoreValue),hl
-                ld hl,4
+                ld hl,FIELD_SCORE_X
                 ld (CacheScoreX),hl
-                ld a,237
+                ld a,239
                 ld (CacheScoreY),a
                 xor a
                 ld (CacheScorePrinted),a
@@ -1210,10 +1230,11 @@ CacheDrawScore:
                 ld (CacheScoreForceDraw),a
                 ld de,1
                 call CacheDrawScorePlace
+                call CacheDrawFieldMedal
                 ld hl,(HighScore)
                 ld (CacheScoreValue),hl
                 call CacheSetFieldHighScoreX
-                ld a,237
+                ld a,239
                 ld (CacheScoreY),a
                 xor a
                 ld (CacheScorePrinted),a
@@ -1246,13 +1267,13 @@ CacheClearScoreRect:
                 jr nz,.firstpg
                 ld hl,#4140+4
 .firstpg:       ld e,237
-                ld b,10
+                ld b,12
 .rowLoop:       ld a,e
                 out (Y_PORT),a
                 inc e
                 di
                 ld d,d
-                ld a,32
+                ld a,72
                 ld c,c
                 ld a,2
                 ld (hl),a
@@ -1271,7 +1292,7 @@ CacheClearHighScoreRect:
                 jr nz,.firstpg
                 ld hl,#4140+272
 .firstpg:       ld e,237
-                ld b,10
+                ld b,12
 .rowLoop:       ld a,e
                 out (Y_PORT),a
                 inc e
@@ -1286,6 +1307,135 @@ CacheClearHighScoreRect:
                 ld a,#c0
                 out (Y_PORT),a
                 ret
+
+CacheRestoreFieldMedalBackground:
+                in a,(RGMOD)
+                ld de,FieldMedalFirstY
+                and 1
+                jr nz,.first
+                ld de,FieldMedalSecondY
+.first:         ld a,(de)
+                cp #ff
+                ret z
+                ld hl,#c000+FIELD_MEDAL_X
+                ld bc,#1818
+                jp CacheRestoreRect
+
+CacheDrawFieldMedal:
+                ld a,(FieldMedalId)
+                cp #ff
+                jr z,.placeholder
+                call CacheUpdateFieldMedalAnimation
+                ld (FieldMedalCurrentY),a
+                jr .draw
+.placeholder:   ld a,FIELD_MEDAL_TARGET_Y
+                ld (FieldMedalCurrentY),a
+.draw:
+                in a,(RGMOD)
+                ld hl,FieldMedalFirstY
+                and 1
+                jr nz,.first
+                ld hl,FieldMedalSecondY
+.first:         ld a,(FieldMedalCurrentY)
+                ld (hl),a
+                in a,(EmmWin.P1)
+                push af
+                in a,(EmmWin.P3)
+                push af
+                ld a,#5c
+                out (EmmWin.P1),a
+                ld a,(MemoryBuffer.memUi)
+                out (EmmWin.P3),a
+                ld a,(FieldMedalId)
+                cp #ff
+                jr z,.placeholderSource
+                ld hl,UiCoins
+                and a
+                jr z,.sourceReady
+                ld bc,24*24
+.sourceLoop:    add hl,bc
+                dec a
+                jr nz,.sourceLoop
+                jr .sourceReady
+.placeholderSource:
+                ld hl,UiMedalPlaceholder
+.sourceReady:   ld de,#4000+FIELD_MEDAL_X
+                in a,(RGMOD)
+                and 1
+                jr nz,.firstpg
+                ld de,#4140+FIELD_MEDAL_X
+.firstpg:       ld b,24
+                ld a,(FieldMedalCurrentY)
+.rowLoop:       out (Y_PORT),a
+                inc a
+                push af
+                push bc
+                push de
+                push hl
+                di
+                ld d,d
+                ld a,24
+                ld l,l
+                ld a,(hl)
+                ld (de),a
+                ld b,b
+                pop hl
+                ld bc,24
+                add hl,bc
+                pop de
+                pop bc
+                pop af
+                djnz .rowLoop
+                ld a,#c0
+                out (Y_PORT),a
+                pop af
+                out (EmmWin.P3),a
+                pop af
+                out (EmmWin.P1),a
+                ret
+
+CacheUpdateFieldMedalAnimation:
+                ld a,(FieldMedalAnim)
+                and a
+                jr z,.static
+                cp 9
+                jr nz,.soundDone
+                push af
+                call SfxQueuePoint
+                pop af
+.soundDone:
+                push af
+                ld c,a
+                ld b,0
+                dec bc
+                ld hl,FieldMedalYTable
+                add hl,bc
+                ld a,(hl)
+                ld (FieldMedalCurrentY),a
+                pop af
+                inc a
+                cp 13
+                jr c,.store
+                xor a
+.store:         ld (FieldMedalAnim),a
+                ld a,(FieldMedalCurrentY)
+                ret
+.static:        ld a,FIELD_MEDAL_TARGET_Y
+                ret
+
+FieldMedalYTable:
+                db FIELD_MEDAL_TARGET_Y-32
+                db FIELD_MEDAL_TARGET_Y-28
+                db FIELD_MEDAL_TARGET_Y-24
+                db FIELD_MEDAL_TARGET_Y-20
+                db FIELD_MEDAL_TARGET_Y-16
+                db FIELD_MEDAL_TARGET_Y-12
+                db FIELD_MEDAL_TARGET_Y-8
+                db FIELD_MEDAL_TARGET_Y-4
+                db FIELD_MEDAL_TARGET_Y
+                db FIELD_MEDAL_TARGET_Y-6
+                db FIELD_MEDAL_TARGET_Y-2
+                db FIELD_MEDAL_TARGET_Y
 
 CacheSetFieldHighScoreX:
                 ld bc,304

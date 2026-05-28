@@ -37,6 +37,7 @@
 ..\cutted\coin1.png
 ..\cutted\coin2.png
 ..\cutted\coin3.png
+..\cutted\medal_placeholder.png
 ..\cutted\ui_hand.png
 ..\cutted\title_get_ready.png
 ..\cutted\title_game_over.png

@@ -40,6 +40,7 @@ assets.png cutted\coin0.png 240 64 24 24
 assets.png cutted\coin1.png 264 64 24 24
 assets.png cutted\coin2.png 240 88 24 24
 assets.png cutted\coin3.png 264 88 24 24
+assets.png cutted\medal_placeholder.png 240 112 24 24
 assets.png cutted\ui_hand.png 112 96 16 18
 assets.png cutted\title_get_ready.png 136 112 96 25
 assets.png cutted\title_game_over.png 136 144 96 25

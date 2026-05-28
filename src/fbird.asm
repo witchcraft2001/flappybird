@@ -1100,6 +1100,9 @@ fHandler        db 0
 DrawTextX:      db 0
 DrawTextY:      db 0
 FONT_BACKGROUND_INDEX equ 38
+FIELD_SCORE_X   equ 30
+FIELD_MEDAL_X   equ 4
+FIELD_MEDAL_TARGET_Y equ 231
 SfxCurrentId:   db 0
 SfxCurrentPage: db 0
 SfxCurrentPtr:  dw 0
@@ -1108,6 +1111,14 @@ SfxQueue0:      db 0
 SfxQueue1:      db 0
 SfxServiceChunkCounter:
                 db 0
+FieldMedalId:   db #ff
+FieldMedalAnim: db 0
+FieldMedalFirstY:
+                db #ff
+FieldMedalSecondY:
+                db #ff
+FieldMedalCurrentY:
+                db #ff
 
 PressToPlayText:
                 db "PRESS TO PLAY",0
@@ -1158,7 +1169,8 @@ MemoryDescriptor:
 UiBigDigits:    equ #C000
 UiSmallDigits:  equ UiBigDigits+16*20*10
 UiCoins:        equ UiSmallDigits+8*10*10
-UiHand:         equ UiCoins+24*24*4
+UiMedalPlaceholder: equ UiCoins+24*24*4
+UiHand:         equ UiMedalPlaceholder+24*24
 UiGetReady:     equ UiHand+16*18
 UiGameOver:     equ UiGetReady+96*25
 UiFlappyBird:   equ UiGameOver+96*25
