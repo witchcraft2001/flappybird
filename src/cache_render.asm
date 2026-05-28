@@ -205,6 +205,7 @@ CacheSetGameOver:
                 ld a,(GemeOver)
                 and a
                 ret nz
+                call SfxQueueHitDie
                 ld a,1
                 ld (GemeOver),a
                 ld (GameOverWaitRelease),a
@@ -625,11 +626,27 @@ CacheAddScore:
                 ld hl,(Score)
                 inc hl
                 ld (Score),hl
+                call CacheCheckMedalSfx
                 call CacheUpdateHighScore
                 call CacheUpdateBiomeParams
                 pop hl
                 pop af
                 ret
+
+CacheCheckMedalSfx:
+                ld a,h
+                and a
+                ret nz
+                ld a,l
+                cp 10
+                jr z,.play
+                cp 25
+                jr z,.play
+                cp 50
+                jr z,.play
+                cp 100
+                ret nz
+.play:          jp SfxQueuePoint
 
 CacheUpdateHighScore:
                 push af

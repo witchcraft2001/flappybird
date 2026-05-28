@@ -4,6 +4,7 @@
                 include "include/dss_equ.asm"
                 include "include/bios_equ.asm"
                 include "include/sp_equ.asm"
+                include "sfx_len.asm"
 
 begin:		jp main
 
@@ -86,6 +87,11 @@ main:	        di
                 ld b,1
                 call LoadResourceList
                 jp c,.error
+                ld de,MemoryBuffer.memSfxHit
+                ld hl,sfxHit
+                ld b,3
+                call LoadResourceList
+                jp c,.error
                 call DrawPressToPlay
                 call WaitTitlePress
                 ld hl,TitlePalette+1
@@ -102,6 +108,7 @@ main:	        di
                 ld de,Im2Handler
                 call set_im2
                 call PlayerInit
+                call SfxInit
                 call InitRenderCache
                 call FillShadowScreen
                 call DrawCity
@@ -118,6 +125,8 @@ main:	        di
                 jr nz,.paletteReady
                 ld (Im2Handler.needChangePage),a        ;Переключаем основной экран на 1
 .paletteReady:
+                call RunRenderCache
+                call WaitVsync
                 ld hl,Palette+1
                 ld de,TempPal
                 ld a,(Palette)
@@ -157,6 +166,7 @@ main:	        di
                 ; ld d,a
                 ; ld e,0                
                 ; call FadePallete
+                call SfxShutdown
                 call PlayerMute
                 call set_im1
                 call RestoreVideoMode
@@ -875,6 +885,147 @@ PlayerMute:
                 call PlayerStart+8
                 jr PlayerInit.exit
 
+SFX_ID_NONE     equ 0
+SFX_ID_HIT      equ 1
+SFX_ID_DIE      equ 2
+SFX_ID_POINT    equ 3
+
+SfxInit:
+                xor a
+                ld (SfxCurrentId),a
+                ld (SfxQueue0),a
+                ld (SfxQueue1),a
+                ld (SfxServiceChunkCounter),a
+                ld bc,CBL_CTRL
+                out (c),a
+                ld bc,CBL_DATA
+.flush:         ld a,CBL_SILENCE
+                out (c),a
+                ld a,(SfxServiceChunkCounter)
+                dec a
+                ld (SfxServiceChunkCounter),a
+                jr nz,.flush
+                ld bc,CBL_CTRL
+                ld a,CBL_CTRL_RUN_11K_MONO
+                out (c),a
+                ret
+
+SfxShutdown:
+                xor a
+                ld (SfxCurrentId),a
+                ld (SfxQueue0),a
+                ld (SfxQueue1),a
+                ld bc,CBL_CTRL
+                out (c),a
+                ret
+
+SfxQueueHitDie:
+                ld a,(SfxCurrentId)
+                cp SFX_ID_HIT
+                ret z
+                cp SFX_ID_DIE
+                ret z
+                ld a,SFX_ID_HIT
+                ld (SfxQueue0),a
+                ld a,SFX_ID_DIE
+                ld (SfxQueue1),a
+                xor a
+                ld (SfxCurrentId),a
+                jp SfxStartNext
+
+SfxQueuePoint:
+                ld a,(SfxCurrentId)
+                and a
+                ret nz
+                ld a,(SfxQueue0)
+                and a
+                ret nz
+                ld a,SFX_ID_POINT
+                ld (SfxQueue0),a
+                jp SfxStartNext
+
+SfxStartNext:
+                ld a,(SfxCurrentId)
+                and a
+                ret nz
+                ld a,(SfxQueue0)
+                and a
+                ret z
+                ld (SfxCurrentId),a
+                push af
+                ld a,(SfxQueue1)
+                ld (SfxQueue0),a
+                xor a
+                ld (SfxQueue1),a
+                pop af
+                cp SFX_ID_HIT
+                jr z,.hit
+                cp SFX_ID_DIE
+                jr z,.die
+                cp SFX_ID_POINT
+                jr z,.point
+                xor a
+                ld (SfxCurrentId),a
+                ret
+.hit:           ld a,(MemoryBuffer.memSfxHit)
+                ld de,SFX_HIT_LEN
+                jr .store
+.die:           ld a,(MemoryBuffer.memSfxDie)
+                ld de,SFX_DIE_LEN
+                jr .store
+.point:         ld a,(MemoryBuffer.memSfxPoint)
+                ld de,SFX_POINT_LEN
+.store:         ld (SfxCurrentPage),a
+                ld hl,#C000
+                ld (SfxCurrentPtr),hl
+                ld (SfxRemaining),de
+                ret
+
+SfxService:
+                ld a,(SfxCurrentId)
+                and a
+                call z,SfxStartNext
+                ld a,(SfxCurrentId)
+                and a
+                ret z
+                ld a,SFX_CHUNK_BYTES
+                ld (SfxServiceChunkCounter),a
+.loadState:     ld a,(SfxCurrentPage)
+                out (EmmWin.P3),a
+                ld hl,(SfxCurrentPtr)
+                ld de,(SfxRemaining)
+                ld bc,CBL_DATA
+.loop:          ld a,d
+                or e
+                jr z,.finishSample
+                ld a,(hl)
+                out (c),a
+                inc hl
+                dec de
+                ld a,(SfxServiceChunkCounter)
+                dec a
+                ld (SfxServiceChunkCounter),a
+                jr nz,.loop
+                ld (SfxCurrentPtr),hl
+                ld (SfxRemaining),de
+                ret
+.finishSample:  xor a
+                ld (SfxCurrentId),a
+                call SfxStartNext
+                ld a,(SfxCurrentId)
+                and a
+                jr nz,.loadState
+                ld bc,CBL_DATA
+.silenceLoop:   ld a,(SfxServiceChunkCounter)
+                and a
+                ret z
+                ld a,CBL_SILENCE
+                out (c),a
+                ld a,(SfxServiceChunkCounter)
+                dec a
+                ld (SfxServiceChunkCounter),a
+                jr .silenceLoop
+
 Im2Handler:     di
                 push af
                 push hl
@@ -905,6 +1056,7 @@ Im2Handler:     di
 .musicEnabled:  equ $-1
                 and a
                 call nz,Player
+                call SfxService
                 pop af
                 out (EmmWin.P3),a
                 ld a,1
@@ -948,6 +1100,14 @@ fHandler        db 0
 DrawTextX:      db 0
 DrawTextY:      db 0
 FONT_BACKGROUND_INDEX equ 38
+SfxCurrentId:   db 0
+SfxCurrentPage: db 0
+SfxCurrentPtr:  dw 0
+SfxRemaining:   dw 0
+SfxQueue0:      db 0
+SfxQueue1:      db 0
+SfxServiceChunkCounter:
+                db 0
 
 PressToPlayText:
                 db "PRESS TO PLAY",0
@@ -968,8 +1128,11 @@ MemoryBuffer:
 .memTitle4      db 0
 .memTitle5      db 0
 .memMusic       db 0
+.memSfxHit      db 0
+.memSfxDie      db 0
+.memSfxPoint    db 0
                 db 0
-assetsBlocks    db 14
+assetsBlocks    db 17
 
 AssetsDirName   db "ASSETS",0
 city            db "city.bin",0
@@ -986,6 +1149,9 @@ title3          db "title.b02",0
 title4          db "title.b03",0
 title5          db "title.b04",0
 music           db "music.bin",0
+sfxHit          db "hit.raw",0
+sfxDie          db "die.raw",0
+sfxPoint        db "point.raw",0
 MemoryDescriptor:
                 db 0
 

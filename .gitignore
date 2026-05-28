@@ -4,7 +4,9 @@ src/build/
 src/FBIRD.EXE
 src/fbird.lst
 src/res_pal.asm
+src/sfx_len.asm
 src/assets/*.bin
+src/assets/*.raw
 assets/cutted/
 assets/resources/
 tools/__pycache__/

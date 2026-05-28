@@ -31,6 +31,9 @@ copy /Y assets\title.b02 /B X:\%PROG%\ASSETS\ /B
 copy /Y assets\title.b03 /B X:\%PROG%\ASSETS\ /B
 copy /Y assets\title.b04 /B X:\%PROG%\ASSETS\ /B
 copy /Y assets\music.bin /B X:\%PROG%\ASSETS\ /B
+copy /Y assets\hit.raw /B X:\%PROG%\ASSETS\ /B
+copy /Y assets\die.raw /B X:\%PROG%\ASSETS\ /B
+copy /Y assets\point.raw /B X:\%PROG%\ASSETS\ /B
 
 mkdir build\%PROG%
 mkdir build\%PROG%\ASSETS
@@ -50,6 +53,9 @@ copy /Y assets\title.b02 /B X:\%PROG%\ASSETS /B
 copy /Y assets\title.b03 /B X:\%PROG%\ASSETS /B
 copy /Y assets\title.b04 /B X:\%PROG%\ASSETS /B
 copy /Y assets\music.bin /B X:\%PROG%\ASSETS /B
+copy /Y assets\hit.raw /B X:\%PROG%\ASSETS /B
+copy /Y assets\die.raw /B X:\%PROG%\ASSETS /B
+copy /Y assets\point.raw /B X:\%PROG%\ASSETS /B
 copy /Y %PROG%.EXE /B build\%PROG%\ /B
 copy /Y assets\city.bin /B build\%PROG%\ASSETS /B
 copy /Y assets\way.bin /B build\%PROG%\ASSETS /B
@@ -65,6 +71,9 @@ copy /Y assets\title.b02 /B build\%PROG%\ASSETS /B
 copy /Y assets\title.b03 /B build\%PROG%\ASSETS /B
 copy /Y assets\title.b04 /B build\%PROG%\ASSETS /B
 copy /Y assets\music.bin /B build\%PROG%\ASSETS /B
+copy /Y assets\hit.raw /B build\%PROG%\ASSETS /B
+copy /Y assets\die.raw /B build\%PROG%\ASSETS /B
+copy /Y assets\point.raw /B build\%PROG%\ASSETS /B
 
 if errorlevel 1 goto ERR
 rem Delay before unmounting image
