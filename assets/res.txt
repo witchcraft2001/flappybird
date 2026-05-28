@@ -42,3 +42,4 @@
 ..\cutted\title_game_over.png
 ..\cutted\title_flappybird.png
 ..\cutted\gopanel.png
+..\font.png

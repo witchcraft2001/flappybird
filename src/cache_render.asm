@@ -175,7 +175,7 @@ CacheRestartGame:
                 ld (ReadyCounter),a
                 xor a
                 ld (CurrentBiome),a
-                ld a,112
+                ld a,156
                 ld (CurrentTubeInterval),a
                 ld a,80
                 ld (CurrentTubeGap),a
@@ -669,31 +669,31 @@ CacheUpdateBiomeParams:
                 jr c,.villageDay
 .villageNight:  ld a,BIOME_VILLAGE_NIGHT
                 ld (CurrentBiome),a
-                ld a,96
+                ld a,104
                 ld (CurrentTubeInterval),a
                 ld a,64
                 jr .setGap
 .villageDay:    ld a,BIOME_VILLAGE_DAY
                 ld (CurrentBiome),a
-                ld a,100
+                ld a,116
                 ld (CurrentTubeInterval),a
                 ld a,68
                 jr .setGap
 .cityNight:     ld a,BIOME_CITY_NIGHT
                 ld (CurrentBiome),a
-                ld a,104
+                ld a,132
                 ld (CurrentTubeInterval),a
                 ld a,72
                 jr .setGap
 .cityEvening:   ld a,BIOME_CITY_EVENING
                 ld (CurrentBiome),a
-                ld a,108
+                ld a,148
                 ld (CurrentTubeInterval),a
                 ld a,76
                 jr .setGap
 .cityDay:       ld a,BIOME_CITY_DAY
                 ld (CurrentBiome),a
-                ld a,112
+                ld a,156
                 ld (CurrentTubeInterval),a
                 ld a,80
 .setGap:        ld (CurrentTubeGap),a
@@ -767,9 +767,9 @@ CacheGetSpawnDistance:
 .extra24:       ld b,24
 .addBase:       call CacheGetIntervalJitter
                 add a,b
-                cp 128
+                cp 177
                 jr c,.store
-                ld a,127
+                ld a,176
 .store:
                 ld e,a
                 ld d,0
@@ -852,6 +852,7 @@ CacheSelectTubeYByIndex:
                 ret
 
 CacheRandom:
+                push bc
                 ld a,r
                 ld b,a
                 ld a,(RandomSeed)
@@ -862,6 +863,7 @@ CacheRandom:
                 jr nz,.store
                 ld a,#a7
 .store:         ld (RandomSeed),a
+                pop bc
                 ret
 
 CacheRestoreTube:

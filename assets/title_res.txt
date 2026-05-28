@@ -1,0 +1,5 @@
+reserve 38 255 255 255
+reserve 166 0 0 0
+reserve 191 184 205 255
+reserve 192 252 252 252
+..\title.png

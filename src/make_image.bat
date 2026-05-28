@@ -23,6 +23,13 @@ copy /Y assets\birds.bin /B X:\%PROG%\ASSETS\ /B
 copy /Y assets\tubes.bin /B X:\%PROG%\ASSETS\ /B
 copy /Y assets\ui.bin /B X:\%PROG%\ASSETS\ /B
 copy /Y assets\gopanel.bin /B X:\%PROG%\ASSETS\ /B
+copy /Y assets\font.bin /B X:\%PROG%\ASSETS\ /B
+copy /Y assets\title.bin /B X:\%PROG%\ASSETS\ /B
+copy /Y assets\title.b00 /B X:\%PROG%\ASSETS\ /B
+copy /Y assets\title.b01 /B X:\%PROG%\ASSETS\ /B
+copy /Y assets\title.b02 /B X:\%PROG%\ASSETS\ /B
+copy /Y assets\title.b03 /B X:\%PROG%\ASSETS\ /B
+copy /Y assets\title.b04 /B X:\%PROG%\ASSETS\ /B
 copy /Y assets\music.bin /B X:\%PROG%\ASSETS\ /B
 
 mkdir build\%PROG%
@@ -35,6 +42,13 @@ copy /Y assets\birds.bin /B X:\%PROG%\ASSETS /B
 copy /Y assets\tubes.bin /B X:\%PROG%\ASSETS /B
 copy /Y assets\ui.bin /B X:\%PROG%\ASSETS /B
 copy /Y assets\gopanel.bin /B X:\%PROG%\ASSETS /B
+copy /Y assets\font.bin /B X:\%PROG%\ASSETS /B
+copy /Y assets\title.bin /B X:\%PROG%\ASSETS /B
+copy /Y assets\title.b00 /B X:\%PROG%\ASSETS /B
+copy /Y assets\title.b01 /B X:\%PROG%\ASSETS /B
+copy /Y assets\title.b02 /B X:\%PROG%\ASSETS /B
+copy /Y assets\title.b03 /B X:\%PROG%\ASSETS /B
+copy /Y assets\title.b04 /B X:\%PROG%\ASSETS /B
 copy /Y assets\music.bin /B X:\%PROG%\ASSETS /B
 copy /Y %PROG%.EXE /B build\%PROG%\ /B
 copy /Y assets\city.bin /B build\%PROG%\ASSETS /B
@@ -43,6 +57,13 @@ copy /Y assets\birds.bin /B build\%PROG%\ASSETS /B
 copy /Y assets\tubes.bin /B build\%PROG%\ASSETS /B
 copy /Y assets\ui.bin /B build\%PROG%\ASSETS /B
 copy /Y assets\gopanel.bin /B build\%PROG%\ASSETS /B
+copy /Y assets\font.bin /B build\%PROG%\ASSETS /B
+copy /Y assets\title.bin /B build\%PROG%\ASSETS /B
+copy /Y assets\title.b00 /B build\%PROG%\ASSETS /B
+copy /Y assets\title.b01 /B build\%PROG%\ASSETS /B
+copy /Y assets\title.b02 /B build\%PROG%\ASSETS /B
+copy /Y assets\title.b03 /B build\%PROG%\ASSETS /B
+copy /Y assets\title.b04 /B build\%PROG%\ASSETS /B
 copy /Y assets\music.bin /B build\%PROG%\ASSETS /B
 
 if errorlevel 1 goto ERR

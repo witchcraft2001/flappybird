@@ -20,19 +20,33 @@ def output_name(path, counter):
 
 def add_color(palette, color):
     if color not in palette:
-        if len(palette) >= 255:
-            raise ValueError("The size of the palette table is exceeded")
-        palette.append(color)
+        try:
+            index = palette.index(None)
+            palette[index] = color
+        except ValueError:
+            if len(palette) >= 255:
+                raise ValueError("The size of the palette table is exceeded")
+            palette.append(color)
     return palette.index(color)
 
 
 def merge_palette(global_palette, local_palette):
     for color in local_palette:
         if color[3] == 255 and color not in global_palette:
-            global_palette.append(color)
+            add_color(global_palette, color)
 
-    if len(global_palette) > 256:
+    if len(global_palette) > 255:
         raise ValueError("The size of the palette table is exceeded")
+
+
+def merge_image_colors(global_palette, source):
+    image = read_png(source)
+    merge_palette(global_palette, image["palette"])
+
+    for row in image["pixels"]:
+        for color in row:
+            if color[3] == 255 and color not in global_palette:
+                add_color(global_palette, color)
 
 
 def process_png(source, output, palette):
@@ -65,7 +79,10 @@ def process_png(source, output, palette):
 
 def write_palette(path, palette):
     lines = [f"        ;Palette of {len(palette)} colors", f"        db  {len(palette)}"]
-    for r, g, b, _a in palette:
+    for color in palette:
+        if color is None:
+            color = (0, 0, 0, 255)
+        r, g, b, _a = color
         lines.append(f"        db  0x{b:02X}, 0x{g:02X}, 0x{r:02X}, 0x00")
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -80,9 +97,34 @@ def process_spec(spec_file):
             if not line or line.startswith("#"):
                 continue
 
-            source = normalize_path(line)
+            parts = line.split()
+            reserve = len(parts) == 5 and parts[0].lower() == "reserve"
+            palette_only = len(parts) == 2 and parts[0].lower() == "palette"
+            if reserve:
+                index = int(parts[1], 0)
+                if index < 0 or index >= 255:
+                    raise ValueError(f"{spec_file}:{line_number}: reserve index is out of range")
+                color = tuple(int(part, 0) for part in parts[2:5]) + (255,)
+                while len(palette) <= index:
+                    palette.append(None)
+                if palette[index] is not None and palette[index] != color:
+                    raise ValueError(f"{spec_file}:{line_number}: palette index {index} is already reserved")
+                palette[index] = color
+                continue
+
+            if palette_only:
+                source = normalize_path(parts[1])
+            elif len(parts) == 1:
+                source = normalize_path(parts[0])
+            else:
+                raise ValueError(f"{spec_file}:{line_number}: expected path or 'palette path'")
+
             if not source.exists():
                 raise FileNotFoundError(f"{spec_file}:{line_number}: {source} not found")
+
+            if palette_only:
+                merge_image_colors(palette, source)
+                continue
 
             output = Path(source.stem + ".bin")
             process_png(source, output, palette)

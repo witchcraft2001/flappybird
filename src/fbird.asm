@@ -54,48 +54,55 @@ main:	        di
                 ld hl,MemoryBuffer
                 ld c,Bios.Emm_Fn5
                 rst #08
-                pop bc
-                ld de,MemoryBuffer
-                ld hl,city
-.loadLoop:      push de
-                push bc
-                push hl
-                call LoadResource
-                jp c,.error                
-                pop hl
-                call FindNextName
-                pop bc
-                pop de
-                inc de
-                djnz .loadLoop                
+                pop af
+                ld de,MemoryBuffer.memTitle0
+                ld hl,title0
+                ld b,6
+                call LoadResourceList
+                jp c,.error
                 call ChangeVideoMode
-                ld hl,Palette+1
-                ld a,(Palette)
+                ld hl,TempPal
+                call ResetPallete
+                call DrawTitleScreen
+                ld hl,TitlePalette+1
+                ld de,TempPal
+                ld a,(TitlePalette)
+                ld b,a
+                ld c,0
+                call UnfadePallete
+                ld hl,TitlePalette+1
+                ld a,(TitlePalette)
                 ld d,a
                 ld e,0
                 ld a,1
                 call SetPalette
-                ld hl,Palette+1
-                ld a,(Palette)
+                ld de,MemoryBuffer
+                ld hl,city
+                ld b,7
+                call LoadResourceList
+                jp c,.error
+                ld de,MemoryBuffer.memMusic
+                ld hl,music
+                ld b,1
+                call LoadResourceList
+                jp c,.error
+                call DrawPressToPlay
+                call WaitTitlePress
+                ld hl,TitlePalette+1
+                ld de,TempPal
+                ld a,(TitlePalette)
+                call CopyPaletteToTemp
+                ld hl,TempPal
+                ld a,(TitlePalette)
                 ld d,a
                 ld e,0
-                ld a,0
-                call SetPalette
-
-                ; ld hl,TempPal
-                ; call ResetPallete
-                ; call ShowBackground
-                ; call CopyBackground
+                call FadePallete
+                ld hl,TempPal
+                call ResetPallete
                 ld de,Im2Handler
                 call set_im2
                 call PlayerInit
                 call InitRenderCache
-                ; ld hl,Palette+1
-                ; ld de,TempPal
-                ; ld a,(Palette)
-                ; ld b,a
-                ; ld c,0
-                ; call UnfadePallete
                 call FillShadowScreen
                 call DrawCity
                 call DrawWay
@@ -108,9 +115,23 @@ main:	        di
                 in a,(RGMOD)
                 and a
                 ld a,1
-                jr nz,.loop
+                jr nz,.paletteReady
                 ld (Im2Handler.needChangePage),a        ;Переключаем основной экран на 1
-.loop:          call WaitVsync
+.paletteReady:
+                ld hl,Palette+1
+                ld de,TempPal
+                ld a,(Palette)
+                ld b,a
+                ld c,0
+                call UnfadePallete
+                ld hl,Palette+1
+                ld a,(Palette)
+                ld d,a
+                ld e,0
+                ld a,1
+                call SetPalette
+.loop:
+                call WaitVsync
                 ld a,2
                 out (#fe),a
                 call RunRenderCache
@@ -144,10 +165,7 @@ main:	        di
 	        rst #10
 	        ret
 
-.error:         pop hl
-                pop de
-                pop bc
-                jp  FileReadError
+.error:         jp  FileReadError
 
 ;Обновляем флаг необходимости смены основного экрана
 UpdateScreenFlag:
@@ -167,6 +185,31 @@ WaitVsync:      di
                 ei
                 ret
 
+LoadResourceList:
+.loop:          push de
+                push bc
+                push hl
+                call LoadResourceSilent
+                jr c,.error
+                pop hl
+                call FindNextName
+                pop bc
+                pop de
+                inc de
+                djnz .loop
+                and a
+                ret
+.error:         pop hl
+                pop bc
+                pop de
+                scf
+                ret
+
+LoadResourceSilent:
+                ld  a,(de)
+                out (EmmWin.P3),a
+                jr LoadResource.open
+
 LoadResource:   ld  a,(de)
                 out (EmmWin.P3),a
                 push hl
@@ -176,6 +219,7 @@ LoadResource:   ld  a,(de)
                 ld c,Dss.PChars
                 rst #10
                 pop hl
+.open:
                 xor a
 	        ld c,Dss.Open
 	        rst #10
@@ -191,6 +235,195 @@ LoadResource:   ld  a,(de)
                 ld c,Dss.Close
                 rst #10
                 pop af
+                ret
+
+CopyPaletteToTemp:
+                ld c,a
+                ld b,0
+                sla c
+                rl b
+                sla c
+                rl b
+                ldir
+                ret
+
+DrawTitleScreen:
+                ld a,(MemoryBuffer.memTitle0)
+                ld b,51
+                ld c,0
+                call DrawTitleChunk
+                ld a,(MemoryBuffer.memTitle1)
+                ld b,51
+                ld c,51
+                call DrawTitleChunk
+                ld a,(MemoryBuffer.memTitle2)
+                ld b,51
+                ld c,102
+                call DrawTitleChunk
+                ld a,(MemoryBuffer.memTitle3)
+                ld b,51
+                ld c,153
+                call DrawTitleChunk
+                ld a,(MemoryBuffer.memTitle4)
+                ld b,51
+                ld c,204
+                call DrawTitleChunk
+                ld a,(MemoryBuffer.memTitle5)
+                ld b,1
+                ld c,255
+                jp DrawTitleChunk
+
+DrawTitleChunk:
+                ex af,af'
+                in a,(EmmWin.P1)
+                push af
+                in a,(EmmWin.P3)
+                push af
+                ld a,#50
+                out (EmmWin.P1),a
+                ex af,af'
+                out (EmmWin.P3),a
+                ld hl,TitleScreen
+.rowLoop:       ld a,c
+                out (Y_PORT),a
+                inc c
+                push bc
+                push hl
+                ld de,#4000
+                ld bc,320
+                ldir
+                pop hl
+                push hl
+                ld de,#4140
+                ld bc,320
+                ldir
+                pop hl
+                ld de,320
+                add hl,de
+                pop bc
+                djnz .rowLoop
+                ld a,#c0
+                out (Y_PORT),a
+                pop af
+                out (EmmWin.P3),a
+                pop af
+                out (EmmWin.P1),a
+                ret
+
+DrawPressToPlay:
+                ld hl,PressToPlayText
+                ld a,108
+                ld b,180
+                jp DrawText
+
+DrawText:
+                ld (DrawTextX),a
+                ld a,b
+                ld (DrawTextY),a
+                in a,(EmmWin.P1)
+                push af
+                in a,(EmmWin.P3)
+                push af
+                ld a,#50
+                out (EmmWin.P1),a
+                ld a,(MemoryBuffer.memFont)
+                out (EmmWin.P3),a
+.loop:          ld a,(hl)
+                and a
+                jr z,.done
+                cp 32
+                jr c,.advance
+                cp 96
+                jr nc,.advance
+                push hl
+                call DrawFontGlyph
+                pop hl
+.advance:       ld a,(DrawTextX)
+                add a,8
+                ld (DrawTextX),a
+                inc hl
+                jr .loop
+.done:          ld a,#c0
+                out (Y_PORT),a
+                pop af
+                out (EmmWin.P3),a
+                pop af
+                out (EmmWin.P1),a
+                ret
+
+DrawFontGlyph:
+                sub 32
+                ld (.tile),a
+                and #0f
+                add a,a
+                add a,a
+                add a,a
+                ld e,a
+                ld d,0
+                ld hl,Font8x8
+                add hl,de
+                ld a,0
+.tile:          equ $-1
+                rrca
+                rrca
+                rrca
+                rrca
+                and #0f
+                add a,a
+                add a,a
+                add a,h
+                ld h,a
+                push hl
+                pop ix
+                ld b,8
+                ld a,(DrawTextY)
+.rowLoop:       out (Y_PORT),a
+                inc a
+                push af
+                push bc
+                ld a,(DrawTextX)
+                ld de,#4000
+                add a,e
+                ld e,a
+                jr nc,.dst1Ready
+                inc d
+.dst1Ready:     ld a,(DrawTextX)
+                ld hl,#4140
+                add a,l
+                ld l,a
+                jr nc,.dst2Ready
+                inc h
+.dst2Ready:     ld c,8
+.pixelLoop:     ld a,(ix+0)
+                cp FONT_BACKGROUND_INDEX
+                jr z,.skipPixel
+                ld (de),a
+                ld (hl),a
+.skipPixel:     inc ix
+                inc de
+                inc hl
+                dec c
+                jr nz,.pixelLoop
+                push ix
+                pop hl
+                ld de,120
+                add hl,de
+                push hl
+                pop ix
+                pop bc
+                pop af
+                djnz .rowLoop
+                ret
+
+WaitTitlePress:
+                xor a
+                ld (KeyPressed),a
+.loop:          call KeysHandler
+                call CheckSpace
+                ret z
+                ld a,(KeyPressed)
+                and a
+                jr z,.loop
                 ret
 FillShadowScreen:
                 in a,(EmmWin.P3)
@@ -712,6 +945,12 @@ CrLf:		db cr,lf,0
 
 Counter:        db 0
 fHandler        db 0
+DrawTextX:      db 0
+DrawTextY:      db 0
+FONT_BACKGROUND_INDEX equ 38
+
+PressToPlayText:
+                db "PRESS TO PLAY",0
 
 MemoryBuffer:
 .memCity        db 0
@@ -721,9 +960,16 @@ MemoryBuffer:
 .memUi          db 0
 .memGameOverPanel:
                 db 0
+.memFont        db 0
+.memTitle0      db 0
+.memTitle1      db 0
+.memTitle2      db 0
+.memTitle3      db 0
+.memTitle4      db 0
+.memTitle5      db 0
 .memMusic       db 0
                 db 0
-assetsBlocks    db 7
+assetsBlocks    db 14
 
 AssetsDirName   db "ASSETS",0
 city            db "city.bin",0
@@ -732,6 +978,13 @@ birds           db "birds.bin",0
 tubes           db "tubes.bin",0
 ui              db "ui.bin",0
 gameOverPanel   db "gopanel.bin",0
+font            db "font.bin",0
+title0          db "title.bin",0
+title1          db "title.b00",0
+title2          db "title.b01",0
+title3          db "title.b02",0
+title4          db "title.b03",0
+title5          db "title.b04",0
 music           db "music.bin",0
 MemoryDescriptor:
                 db 0
@@ -744,6 +997,8 @@ UiGetReady:     equ UiHand+16*18
 UiGameOver:     equ UiGetReady+96*25
 UiFlappyBird:   equ UiGameOver+96*25
 GameOverPanel:  equ #C000
+Font8x8:        equ #C000
+TitleScreen:    equ #C000
 
 ;Страницы, которые были открыты при запуске программы
 Pages:
@@ -792,7 +1047,7 @@ CacheScoreForceDraw:
                 db 0
 CurrentBiome:   db BIOME_CITY_DAY
 CurrentTubeInterval:
-                db 112
+                db 156
 CurrentTubeGap:
                 db 80
 CacheDrawTubeGap:
@@ -805,15 +1060,15 @@ InitialTubes:
                 db 70
                 db 80
 
-                dw 228
+                dw 256
                 db 30
                 db 80
 
-                dw 356
+                dw 412
                 db 110
                 db 80
 
-                dw 484
+                dw 568
                 db 90
                 db 80
 
@@ -822,15 +1077,15 @@ Tubes:
                 db 70
                 db 80
 
-                dw 228
+                dw 256
                 db 30
                 db 80
 
-                dw 356
+                dw 412
                 db 110
                 db 80
 
-                dw 484
+                dw 568
                 db 90
                 db 80
 
@@ -851,15 +1106,15 @@ TubeYVillageNight:
                 db 32,134,42,124,54,114,72,98
 
 TubeIntervalCityDay:
-                db 112,108,104,100
+                db 164,156,152,148
 TubeIntervalCityEvening:
-                db 108,104,100,96
+                db 148,140,136,132
 TubeIntervalCityNight:
-                db 104,100,96,92
+                db 132,124,120,116
 TubeIntervalVillageDay:
-                db 100,96,92,88
+                db 116,108,104,100
 TubeIntervalVillageNight:
-                db 96,92,88,84
+                db 104,96,92,88
 
 InitRenderCache:
                 call OpenCacheWindow
@@ -917,6 +1172,10 @@ CacheRenderCodeStoredEnd:
 Palette:
                 include "res_pal.asm"
 PaletteEnd:
+TitlePalette:
+                include "title_pal.asm"
+TitlePaletteEnd:
+TempPal:        ds 256*4,0
                 
 RedTubeDn:      equ #C000
 RedTubeUp:      equ RedTubeDn+338
@@ -938,7 +1197,7 @@ code_end:
 PlayerStart:
                 include "pt3play.asm"
 MusicModule:
-                incbin "music/mus1.pt3"
+                incbin "music/mus2.pt3"
 PlayerEnd:
                 savebin "assets/music.bin",PlayerStart,PlayerEnd-PlayerStart
                 savebin "FBIRD.EXE",start_addr,code_end-start_addr

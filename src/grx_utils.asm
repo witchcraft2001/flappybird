@@ -231,6 +231,52 @@ SetPalette:
 	ei
 	RET
 
+SetPaletteBoth:
+	di
+	push	af
+	push	bc
+	push	de
+	push	hl
+	in	a,(EmmWin.P3)
+	ld	(.savedWin3),a
+	ld	a,#50
+	out	(EmmWin.P3),a
+	ld	a,e
+	out	(Y_PORT),a
+	ld	b,d
+.loop:
+	ld	a,(hl)		; B
+	ld	(#C3E2),a
+	ld	(#C3E6),a
+	inc	hl
+	ld	a,(hl)		; G
+	ld	(#C3E1),a
+	ld	(#C3E5),a
+	inc	hl
+	ld	a,(hl)		; R
+	ld	(#C3E0),a
+	ld	(#C3E4),a
+	inc	hl
+	ld	a,(hl)		; Y
+	ld	(#C3E3),a
+	ld	(#C3E7),a
+	inc	hl
+	inc	e
+	ld	a,e
+	out	(Y_PORT),a
+	djnz	.loop
+	ld	a,#C0
+	out	(Y_PORT),a
+	ld	a,0
+.savedWin3:	equ	$-1
+	out	(EmmWin.P3),a
+	pop	hl
+	pop	de
+	pop	bc
+	pop	af
+	ei
+	ret
+
 ;Копирует весь основ экран в теневой
 CopyBackground:	
         di
@@ -334,7 +380,7 @@ RestoreBackgroundShadow:
 ResetPallete:
 	push hl
 	xor a
-	ld b,255
+	ld b,0
 .cls1:	ld c,4
 .cls:	ld (hl),a
 	inc hl
@@ -342,73 +388,137 @@ ResetPallete:
 	jr nz,.cls
 	djnz .cls1
 	pop hl
-	ld de,#ff00
-	xor a
-	call SetPalette
+	ld de,#0000
+	call SetPaletteBoth
 	ret
 
-;HL - current pallette
+;HL - target pallette
 ;DE - buffer
 ;B - Colors count
 ;C - Start color number
 UnfadePallete:
 	ei
+	ld (UnfadeTargetPtr),hl
+	ld (UnfadeBufferPtr),de
+	ld a,b
+	ld (UnfadeColorCount),a
+	ld a,c
+	ld (UnfadeStartColor),a
+	ld hl,(UnfadeBufferPtr)
 	push hl
-	push de
-	push bc
 	xor a
-.cls1:	ld c,4
-.cls:	ld (de),a
-	inc de
-	dec c
-	jr nz,.cls
-	djnz .cls1
-	pop de
+	ld bc,1024
+.clearLoop:
+	xor a
+	ld (hl),a
+	inc hl
+	dec bc
+	ld a,b
+	or c
+	jr nz,.clearLoop
 	pop hl
-	push de
-	xor a
-	call SetPalette
+	ld d,0
+	ld a,(UnfadeStartColor)
+	ld e,a
+	call SetPaletteBoth
 	halt
-	pop bc
-	ex de,hl
-	pop hl
-	ld a,64	
+	ld a,1
 .unfadeloop:
 	push af
-	push hl
-	push de
-	push bc
-	push bc
-	push de
-.loop1:	ld c,3
-.loop:	ld a,(de)
-	add 4
-	cp (hl)
-	jr c,.next
+	call BuildFadeLut
+	call BuildUnfadePalette
+	halt
+	ld hl,(UnfadeBufferPtr)
+	ld a,(UnfadeColorCount)
+	ld d,a
+	ld a,(UnfadeStartColor)
+	ld e,a
+	call SetPaletteBoth
+	pop af
+	inc a
+	cp 33
+	jr nz,.unfadeloop
+	ld hl,(UnfadeTargetPtr)
+	ld a,(UnfadeColorCount)
+	ld d,a
+	ld a,(UnfadeStartColor)
+	ld e,a
+	call SetPaletteBoth
+	ret
+
+BuildUnfadePalette:
+	ld hl,(UnfadeTargetPtr)
+	ld de,(UnfadeBufferPtr)
+	ld a,(UnfadeColorCount)
+	ld b,a
+.entryLoop:
+	ld c,3
+.rgbLoop:
 	ld a,(hl)
-.next:	ld (de),a
+	srl a
+	srl a
+	push bc
+	push hl
+	ld l,a
+	ld h,0
+	ld bc,FadeLut
+	add hl,bc
+	ld a,(hl)
+	pop hl
+	pop bc
+	ld (de),a
 	inc hl
 	inc de
 	dec c
-	jr nz,.loop
+	jr nz,.rgbLoop
+	xor a
+	ld (de),a
 	inc hl
 	inc de
-	djnz .loop1
-	pop hl
-	pop de
-	halt
-	xor a
-	call SetPalette
-	pop bc
-	pop de
-	pop hl
-	pop af
-	dec a
-	jr nz,.unfadeloop
+	djnz .entryLoop
+	ret
+
+BuildFadeLut:
+	ld (FadeStep),a
+	ld hl,FadeLut
+	ld c,0
+.loop:
+	ld a,c
 	push bc
-	pop de
-	xor a
-	call SetPalette
+	push hl
+	call ScaleFadeComponent
+	pop hl
+	pop bc
+	ld (hl),a
+	inc hl
+	inc c
+	ld a,c
+	cp 64
+	jr nz,.loop
+	ret
+
+ScaleFadeComponent:
+	ld d,0
+	ld e,a
+	ld hl,0
+	ld a,(FadeStep)
+	ld b,8
+.mulLoop:
+	srl a
+	jr nc,.skipAdd
+	add hl,de
+.skipAdd:
+	sla e
+	rl d
+	djnz .mulLoop
+	ld b,5
+.shiftLoop:
+	srl h
+	rr l
+	djnz .shiftLoop
+	ld a,l
+	add a,a
+	add a,a
 	ret
 
 ;HL - temp buffer with current pallette
@@ -434,8 +544,7 @@ FadePallete:
 	djnz .loop1
 	pop hl
 	halt
-        sub a
-	call SetPalette
+	call SetPaletteBoth
 	pop af
 	dec a
 	jr nz,.fadeloop
@@ -446,3 +555,15 @@ OldVideoMode:
 	DB	0
 OldVideoPage:
 	DB	0
+UnfadeTargetPtr:
+	DW	0
+UnfadeBufferPtr:
+	DW	0
+UnfadeColorCount:
+	DB	0
+UnfadeStartColor:
+	DB	0
+FadeStep:
+	DB	0
+FadeLut:
+	DS	64,0
