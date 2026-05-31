@@ -1202,26 +1202,34 @@ CacheDrawTubeBody:
                 ret
 
 CacheDrawTubeHead:
-                ex af,af'
+                ld (.y),a
                 ld a,TubeHeadHeight
-                ld b,0
-                ld c,0
-.len:           equ $-1
-.loop:          ex af,af'
+                ld (.rows),a
+                di
+.loop:          ld a,0
+.y:             equ $-1
                 out (Y_PORT),a
                 inc a
-                push de
-                push hl
-                push bc
-                ldir
-                pop bc
-                pop hl
-                ld de,TubeWidth
-                add hl,de
-                pop de
-                ex af,af'
+                ld (.y),a
+                ld d,d
+                ld a,0
+.len:           equ $-1
+                ld l,l
+                ld a,(hl)
+                ld (de),a
+                ld b,b
+                ld bc,TubeWidth
+                add hl,bc
+                ld a,0
+.rows:          equ $-1
                 dec a
+                ld (.rows),a
                 jr nz,.loop
+                ld a,(CacheDrawTubeHead.y)
+                ex af,af'
+                ld b,0
+                ld a,(CacheDrawTubeHead.len)
+                ld c,a
                 ret
 
 CacheMarkHudDirty:
@@ -1588,26 +1596,29 @@ CacheDrawSmallDigit:
 
 CacheDrawSmallDigitSprite:
                 ld (.y),a
-                ld b,10
+                ld a,10
+                ld (.rows),a
 .rowLoop:       ld a,0
 .y:             equ $-1
                 out (Y_PORT),a
                 inc a
                 ld (.y),a
-                push bc
                 push de
-                ld c,8
-.colLoop:       ld a,(hl)
-                cp 255
-                jr z,.skipPixel
-                ld (de),a
-.skipPixel:     inc hl
-                inc de
-                dec c
-                jr nz,.colLoop
+                ld bc,8
+                ldi
+                ldi
+                ldi
+                ldi
+                ldi
+                ldi
+                ldi
+                ldi
                 pop de
-                pop bc
-                djnz .rowLoop
+                ld a,0
+.rows:          equ $-1
+                dec a
+                ld (.rows),a
+                jr nz,.rowLoop
                 ret
 
 CacheDrawReadyCountdown:
