@@ -49,7 +49,7 @@ def merge_image_colors(global_palette, source):
                 add_color(global_palette, color)
 
 
-def process_png(source, output, palette):
+def process_png(source, output, palette, transparent_index=None):
     image = read_png(source)
     merge_palette(palette, image["palette"])
 
@@ -70,6 +70,8 @@ def process_png(source, output, palette):
 
             for color in row:
                 index = add_color(palette, color) if color[3] == 255 else 255
+                if transparent_index is not None and index == transparent_index:
+                    index = 255
                 writer.write(bytes((index,)))
                 length += 1
     finally:
@@ -100,6 +102,7 @@ def process_spec(spec_file):
             parts = line.split()
             reserve = len(parts) == 5 and parts[0].lower() == "reserve"
             palette_only = len(parts) == 2 and parts[0].lower() == "palette"
+            transparent = len(parts) == 3 and parts[0].lower() == "transparent"
             if reserve:
                 index = int(parts[1], 0)
                 if index < 0 or index >= 255:
@@ -112,12 +115,20 @@ def process_spec(spec_file):
                 palette[index] = color
                 continue
 
+            transparent_index = None
             if palette_only:
                 source = normalize_path(parts[1])
+            elif transparent:
+                source = normalize_path(parts[1])
+                transparent_index = int(parts[2], 0)
+                if transparent_index < 0 or transparent_index >= 255:
+                    raise ValueError(f"{spec_file}:{line_number}: transparent index is out of range")
             elif len(parts) == 1:
                 source = normalize_path(parts[0])
             else:
-                raise ValueError(f"{spec_file}:{line_number}: expected path or 'palette path'")
+                raise ValueError(
+                    f"{spec_file}:{line_number}: expected path, 'palette path', or 'transparent path index'"
+                )
 
             if not source.exists():
                 raise FileNotFoundError(f"{spec_file}:{line_number}: {source} not found")
@@ -127,7 +138,7 @@ def process_spec(spec_file):
                 continue
 
             output = Path(source.stem + ".bin")
-            process_png(source, output, palette)
+            process_png(source, output, palette, transparent_index)
 
     write_palette(Path(spec_path.stem + "_pal.asm"), palette)
 

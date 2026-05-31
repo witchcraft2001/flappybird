@@ -480,7 +480,7 @@ DrawText:
                 push af
                 in a,(EmmWin.P3)
                 push af
-                ld a,#50
+                ld a,#5C
                 out (EmmWin.P1),a
                 ld a,(MemoryBuffer.memFont)
                 out (EmmWin.P3),a
@@ -549,17 +549,52 @@ DrawFontGlyph:
                 ld l,a
                 jr nc,.dst2Ready
                 inc h
-.dst2Ready:     ld c,8
-.pixelLoop:     ld a,(ix+0)
-                cp FONT_BACKGROUND_INDEX
-                jr z,.skipPixel
+.dst2Ready:     ld a,(ix+0)
                 ld (de),a
                 ld (hl),a
-.skipPixel:     inc ix
+                inc ix
                 inc de
                 inc hl
-                dec c
-                jr nz,.pixelLoop
+                ld a,(ix+0)
+                ld (de),a
+                ld (hl),a
+                inc ix
+                inc de
+                inc hl
+                ld a,(ix+0)
+                ld (de),a
+                ld (hl),a
+                inc ix
+                inc de
+                inc hl
+                ld a,(ix+0)
+                ld (de),a
+                ld (hl),a
+                inc ix
+                inc de
+                inc hl
+                ld a,(ix+0)
+                ld (de),a
+                ld (hl),a
+                inc ix
+                inc de
+                inc hl
+                ld a,(ix+0)
+                ld (de),a
+                ld (hl),a
+                inc ix
+                inc de
+                inc hl
+                ld a,(ix+0)
+                ld (de),a
+                ld (hl),a
+                inc ix
+                inc de
+                inc hl
+                ld a,(ix+0)
+                ld (de),a
+                ld (hl),a
+                inc ix
                 push ix
                 pop hl
                 ld de,120

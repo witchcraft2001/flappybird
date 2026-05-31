@@ -583,6 +583,13 @@ CacheDrawTubes:
                 ld h,(ix+1)
                 ld (iy+0),l
                 ld (iy+1),h
+                call CacheTubeVisible
+                jr c,.visible
+                xor a
+                ld (iy+2),a
+                ld (iy+3),a
+                jr .next
+.visible:
                 ld a,(ix+2)
                 ld (iy+2),a
                 ld a,(ix+3)
@@ -590,7 +597,7 @@ CacheDrawTubes:
                 ld (CacheDrawTubeGap),a
                 ld a,(ix+2)
                 call CacheDrawTube
-                add ix,de
+.next:          add ix,de
                 add iy,de
                 djnz .loop
                 ret
@@ -605,11 +612,37 @@ CacheRestoreTubes:
                 ld de,TUBE_ENTRY_SIZE
 .loop:          ld l,(ix+0)
                 ld h,(ix+1)
+                call CacheTubeVisible
+                jr nc,.next
                 ld a,(ix+2)
                 and a
                 call nz,CacheRestoreTube
-                add ix,de
+.next:          add ix,de
                 djnz .loop
+                ret
+
+CacheTubeVisible:
+                bit 7,h
+                jr nz,.negative
+                ld a,h
+                and a
+                scf
+                ret z
+                cp 1
+                jr nz,.notVisible
+                ld a,l
+                cp #40
+                ret c
+                jr .notVisible
+.negative:      ld a,h
+                cp #ff
+                jr nz,.notVisible
+                ld a,l
+                cp #e7
+                jr c,.notVisible
+                scf
+                ret
+.notVisible:    or a
                 ret
 
 CacheUpdateTubes:
