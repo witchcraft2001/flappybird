@@ -1328,15 +1328,15 @@ Im2Handler:     di
                 push de
                 push ix
                 push iy
-		call SfxHandleCblInterrupt
 		ld a,0
 .needChangePage: equ $-1
 		and a
 		jr z,.skip
-                call ChangeVideoPage
+                call ChangeVideoPage            ;flip first, right at the frame INT
                 xor a
                 ld (.needChangePage),a
-.skip:          in a,(EmmWin.P3)
+.skip:          call SfxHandleCblInterrupt      ;then refill the CBL FIFO
+                in a,(EmmWin.P3)
                 push af
                 ld hl,Counter
                 inc (hl)
