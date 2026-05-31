@@ -157,6 +157,7 @@ CacheCheckGameOverRestart:
 
 CacheRestartGame:
                 call CacheClearPlayfieldPages
+                call CacheMarkHudDirty
                 xor a
                 ld (GemeOver),a
                 ld (GameOverWaitRelease),a
@@ -396,17 +397,27 @@ CacheDrawBird:
 .firstpg:       ld b,12
                 ld a,(BirdY)
                 ld (de),a
-                pop de
-                ex hl,de
-.loop:          out (Y_PORT),a
-                push bc
-                push de
-                ld bc,17
-                ldir
-                pop de
-                pop bc
+                ld (.y),a
+                ex de,hl
+                pop hl
+                di
+.loop:          ld a,0
+.y:             equ $-1
+                out (Y_PORT),a
                 inc a
-                djnz .loop
+                ld (.y),a
+                ld d,d
+                ld a,17
+                ld l,l
+                ld a,(hl)
+                ld (de),a
+                ld b,b
+                ld a,l
+                add a,17
+                ld l,a
+                jr nc,.srcReady
+                inc h
+.srcReady:      djnz .loop
                 pop af
                 out (EmmWin.P3),a
                 pop af
@@ -647,6 +658,7 @@ CacheAddScore:
                 ld hl,(Score)
                 inc hl
                 ld (Score),hl
+                call CacheMarkHudDirty
                 call CacheCheckMedalAward
                 call CacheUpdateHighScore
                 call CacheUpdateBiomeParams
@@ -679,6 +691,7 @@ CacheStartFieldMedalAward:
                 ld (FieldMedalId),a
                 ld a,1
                 ld (FieldMedalAnim),a
+                call CacheMarkHudDirty
                 ret
 
 CacheUpdateHighScore:
@@ -1211,7 +1224,40 @@ CacheDrawTubeHead:
                 jr nz,.loop
                 ret
 
+CacheMarkHudDirty:
+                ld a,1
+                ld (CacheHudDirtyFirst),a
+                ld (CacheHudDirtySecond),a
+                ret
+
+CacheHudNeedsRedraw:
+                ld a,(FieldMedalAnim)
+                and a
+                ret nz
+                in a,(RGMOD)
+                and 1
+                jr nz,.first
+                ld a,(CacheHudDirtySecond)
+                and a
+                ret
+.first:         ld a,(CacheHudDirtyFirst)
+                and a
+                ret
+
+CacheClearCurrentHudDirty:
+                in a,(RGMOD)
+                and 1
+                jr nz,.first
+                xor a
+                ld (CacheHudDirtySecond),a
+                ret
+.first:         xor a
+                ld (CacheHudDirtyFirst),a
+                ret
+
 CacheDrawScore:
+                call CacheHudNeedsRedraw
+                ret z
                 in a,(EmmWin.P1)
                 push af
                 in a,(EmmWin.P3)
@@ -1265,6 +1311,7 @@ CacheDrawScore:
                 ld de,1
                 call CacheDrawScorePlace
                 call CacheDrawFlappyBirdFooter
+                call CacheClearCurrentHudDirty
                 pop af
                 out (EmmWin.P3),a
                 pop af
@@ -1323,6 +1370,8 @@ CacheClearHighScoreRect:
                 ret
 
 CacheRestoreFieldMedalBackground:
+                call CacheHudNeedsRedraw
+                ret z
                 in a,(RGMOD)
                 ld de,FieldMedalFirstY
                 and 1
@@ -1432,6 +1481,10 @@ CacheUpdateFieldMedalAnimation:
                 cp 13
                 jr c,.store
                 xor a
+                ld (FieldMedalAnim),a
+                call CacheMarkHudDirty
+                ld a,(FieldMedalCurrentY)
+                ret
 .store:         ld (FieldMedalAnim),a
                 ld a,(FieldMedalCurrentY)
                 ret

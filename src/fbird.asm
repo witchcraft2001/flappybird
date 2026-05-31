@@ -1528,6 +1528,10 @@ CacheScorePrinted:
                 db 0
 CacheScoreForceDraw:
                 db 0
+CacheHudDirtyFirst:
+                db 1
+CacheHudDirtySecond:
+                db 1
 CurrentBiome:   db BIOME_CITY_DAY
 CurrentTubeInterval:
                 db 156
