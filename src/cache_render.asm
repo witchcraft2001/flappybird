@@ -151,7 +151,9 @@ CacheCheckGameOverRestart:
 .pressed:       ld a,(GameOverWaitRelease)
                 and a
                 ret nz
-                jp CacheRestartGame
+                ld a,1
+                ld (RestartTransitionRequest),a
+                ret
 
 CacheRestartGame:
                 call CacheClearPlayfieldPages
@@ -321,7 +323,15 @@ CacheCheckCollisions:
 CacheCheckSpace:
                 ld a,127
                 in a,(#FE)
-                and 1
+                bit 0,a
+                jr nz,.notPressed
+                ld a,#FE
+                in a,(#FE)
+                bit 0,a
+                jr z,.notPressed
+                xor a
+                ret
+.notPressed:    ld a,1
                 ret
 
 CacheUpdateBirdState:
@@ -401,6 +411,7 @@ CacheDrawBird:
                 out (EmmWin.P3),a
                 pop af
                 out (EmmWin.P1),a
+                ei
                 ret
 
 CacheDrawCity:
@@ -468,6 +479,7 @@ CacheDrawCity:
                 out (EmmWin.P3),a
                 pop af
                 out (EmmWin.P1),a
+                ei
                 ret
 
 CacheUpdateWayPos:
@@ -544,6 +556,7 @@ CacheDrawWay:
                 out (EmmWin.P3),a
                 pop af
                 out (EmmWin.P1),a
+                ei
                 ret
 
 CacheDrawTubes:
@@ -1256,6 +1269,7 @@ CacheDrawScore:
                 out (EmmWin.P3),a
                 pop af
                 out (EmmWin.P1),a
+                ei
                 ret
 
 CacheClearScoreRect:
@@ -1392,6 +1406,7 @@ CacheDrawFieldMedal:
                 out (EmmWin.P3),a
                 pop af
                 out (EmmWin.P1),a
+                ei
                 ret
 
 CacheUpdateFieldMedalAnimation:
@@ -1570,6 +1585,7 @@ CacheDrawReadyCountdown:
                 out (EmmWin.P3),a
                 pop af
                 out (EmmWin.P1),a
+                ei
                 ret
 
 CacheGetReadyDigit:
@@ -1665,6 +1681,7 @@ CacheDrawTitle:
                 out (EmmWin.P3),a
                 pop af
                 out (EmmWin.P1),a
+                ei
                 ret
 
 CacheDrawFlappyBirdFooter:
@@ -1708,6 +1725,7 @@ CacheDrawFlappyBirdFooter:
                 out (EmmWin.P3),a
                 pop af
                 out (EmmWin.P1),a
+                ei
                 ret
 
 CacheDrawGameOverPanel:
@@ -1757,6 +1775,7 @@ CacheDrawGameOverPanelFrame:
                 out (EmmWin.P3),a
                 pop af
                 out (EmmWin.P1),a
+                ei
                 ret
 
 CacheDrawGameOverMedal:
@@ -1812,6 +1831,7 @@ CacheDrawGameOverMedal:
                 out (EmmWin.P3),a
                 pop af
                 out (EmmWin.P1),a
+                ei
                 ret
 
 CacheSelectMedal:
@@ -1892,6 +1912,7 @@ CacheDrawGameOverNumbers:
                 out (EmmWin.P3),a
                 pop af
                 out (EmmWin.P1),a
+                ei
                 ret
 
 CacheSetPanelScoreX:
@@ -1978,6 +1999,7 @@ CacheClearReadyOverlaySky:
                 call CacheClearSkyRect
                 pop af
                 out (EmmWin.P1),a
+                ei
                 ret
 
 CacheClearSkyRect:
@@ -2065,6 +2087,7 @@ CacheClearPlayfieldPages:
                 call .clearPage
                 pop af
                 out (EmmWin.P1),a
+                ei
                 ret
 .clearPage:     push hl
                 ld b,150

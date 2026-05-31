@@ -73,7 +73,10 @@ Im2OtherHandler:
         push    bc
         push    de
         push    hl
+        call    SfxHandleCblInterrupt
+        jr      c,.done
         call    KeysHandler
+.done:
         pop     hl
         pop     de
         pop     bc

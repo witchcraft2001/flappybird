@@ -24,10 +24,29 @@ CheckKeys:
 		ret
 
 CheckSpace:
+		call CheckControlKey
+		cp KEY_SPACE
+		jr z,.pressed
+		ld a,1
+		ret
+.pressed:	xor a
+		ret
+
+CheckControlKey:
 		ld a,127
 		in a,(#FE)
-		and 1
+		bit 0,a
+		jr nz,.none
+		ld a,#FE
+		in a,(#FE)
+		bit 0,a
+		jr z,.esc
+		ld a,KEY_SPACE
 		ret
+.esc:		ld a,KEY_ESC
+		ret
+.none:		xor a
+                ret
 
 KeysHandler:
 .loop:          in a,(SIO_CONTROL_A)

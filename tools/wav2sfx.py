@@ -8,10 +8,10 @@ def read_mono16(path):
     with wave.open(str(path), "rb") as wav:
         if wav.getnchannels() != 1 or wav.getsampwidth() != 2:
             raise ValueError(f"{path}: expected 16-bit mono PCM")
-        if wav.getframerate() not in (10937, 11025):
-            raise ValueError(f"{path}: expected ~11 kHz sample rate")
+        rate = wav.getframerate()
         frames = wav.readframes(wav.getnframes())
-    return [int.from_bytes(frames[i:i + 2], "little", signed=True) for i in range(0, len(frames), 2)]
+    samples = [int.from_bytes(frames[i:i + 2], "little", signed=True) for i in range(0, len(frames), 2)]
+    return samples, rate
 
 
 def trim_silence(samples, threshold):
@@ -24,6 +24,22 @@ def trim_silence(samples, threshold):
     return samples[start:end]
 
 
+def resample(samples, src_rate, dst_rate):
+    if not samples or dst_rate == src_rate:
+        return samples
+    n_out = max(1, round(len(samples) * dst_rate / src_rate))
+    out = []
+    last = len(samples) - 1
+    for i in range(n_out):
+        pos = i * src_rate / dst_rate
+        i0 = int(pos)
+        frac = pos - i0
+        s0 = samples[i0] if i0 <= last else samples[last]
+        s1 = samples[i0 + 1] if i0 + 1 <= last else s0
+        out.append(int(round(s0 + (s1 - s0) * frac)))
+    return out
+
+
 def to_u8(samples):
     out = bytearray()
     for sample in samples:
@@ -33,10 +49,11 @@ def to_u8(samples):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Trim WAV silence and convert SFX to unsigned 8-bit raw.")
+    parser = argparse.ArgumentParser(description="Trim WAV silence, optionally resample, convert SFX to unsigned 8-bit raw.")
     parser.add_argument("--out-dir", default="assets/resources")
     parser.add_argument("--asm", default="assets/resources/sfx_len.asm")
     parser.add_argument("--threshold", type=int, default=384)
+    parser.add_argument("--rate", type=int, default=0, help="target sample rate in Hz (0 = keep source rate)")
     parser.add_argument("wav", nargs="+")
     args = parser.parse_args()
 
@@ -46,7 +63,10 @@ def main():
 
     for wav_path in args.wav:
         source = Path(wav_path)
-        samples = trim_silence(read_mono16(source), args.threshold)
+        samples, src_rate = read_mono16(source)
+        samples = trim_silence(samples, args.threshold)
+        if args.rate:
+            samples = resample(samples, src_rate, args.rate)
         raw = to_u8(samples)
         name = source.stem.upper()
         out_path = out_dir / f"{source.stem}.raw"

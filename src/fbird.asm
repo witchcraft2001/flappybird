@@ -141,16 +141,32 @@ main:	        di
                 call SetPalette
 .loop:
                 call WaitVsync
+                call CheckControlKey
+                cp KEY_ESC
+                jp nz,.render
+                ld a,(GemeOver)
+                and a
+                jp nz,.render
+                ld a,(ReadyCounter)
+                and a
+                jp nz,.render
+                call PauseGame
+                ld a,(PauseExitRequested)
+                and a
+                jp nz,.exit
+                jp .loop
+.render:
                 ld a,2
                 out (#fe),a
                 call RunRenderCache
                 xor a
                 out (#fe),a
+                ld a,(RestartTransitionRequest)
+                and a
+                call nz,RestartGameWithFade
                 ; call Update0Screen
                 ; call UpdateScreenFlag
-                call KeysHandler
-                call CheckKeys
-                jp nc,.loop
+                jp .loop
 
 .exit:
                 in a,(RGMOD)
@@ -177,6 +193,46 @@ main:	        di
 
 .error:         jp  FileReadError
 
+RestartGameWithFade:
+                xor a
+                ld (RestartTransitionRequest),a
+                ld hl,Palette+1
+                ld de,TempPal
+                ld a,(Palette)
+                call CopyPaletteToTemp
+                ld hl,TempPal
+                ld a,(Palette)
+                ld d,a
+                ld e,0
+                call FadePallete
+                ld hl,TempPal
+                call ResetPallete
+                call RestartGameStateInCache
+                call RunRenderCache
+                call WaitVsync
+                call RunRenderCache
+                call WaitVsync
+                ld hl,Palette+1
+                ld de,TempPal
+                ld a,(Palette)
+                ld b,a
+                ld c,0
+                call UnfadePallete
+                ld hl,Palette+1
+                ld a,(Palette)
+                ld d,a
+                ld e,0
+                ld a,1
+                jp SetPalette
+
+RestartGameStateInCache:
+                call OpenCacheWindow
+                ei
+                call CacheRestartGame
+                call CloseCacheWindow
+                ei
+                ret
+
 ;Обновляем флаг необходимости смены основного экрана
 UpdateScreenFlag:
                 ld a,1
@@ -193,6 +249,40 @@ WaitVsync:      di
                 and a
                 jr z,.loop
                 ei
+                ret
+
+PauseGame:
+                xor a
+                ld (PauseExitRequested),a
+                call DrawPauseMessage
+                xor a
+                ld (KeyPressed),a
+.debounce:      ld b,12
+.debounceLoop:  push bc
+                call WaitVsync
+                xor a
+                ld (KeyPressed),a
+                pop bc
+                djnz .debounceLoop
+.waitRelease:   call WaitVsync
+                call CheckControlKey
+                and a
+                jr nz,.waitRelease
+.loop:          call WaitVsync
+                call CheckControlKey
+                cp KEY_ESC
+                jr z,.exit
+                cp KEY_SPACE
+                jr z,.continue
+                jr .loop
+.continue:      call ClearPauseMessage
+                xor a
+                ld (KeyPressed),a
+                ld (PauseExitRequested),a
+                and a
+                ret
+.exit:          ld a,1
+                ld (PauseExitRequested),a
                 ret
 
 LoadResourceList:
@@ -325,6 +415,62 @@ DrawPressToPlay:
                 ld a,108
                 ld b,180
                 jp DrawText
+
+DrawPauseMessage:
+                ld hl,PauseContinueText
+                ld a,PAUSE_TEXT_X
+                ld b,PAUSE_TEXT_Y
+                call DrawText
+                ld hl,PauseExitText
+                ld a,PAUSE_EXIT_TEXT_X
+                ld b,PAUSE_EXIT_TEXT_Y
+                jp DrawText
+
+ClearPauseMessage:
+                in a,(EmmWin.P1)
+                push af
+                ld a,#50
+                out (EmmWin.P1),a
+                ld hl,#4000+PAUSE_TEXT_X
+                ld de,#4140+PAUSE_TEXT_X
+                ld a,PAUSE_TEXT_Y
+                ld b,PAUSE_TEXT_H
+.rowLoop:       push af
+                out (Y_PORT),a
+                di
+                push bc
+                push de
+                push hl
+                ld d,d
+                ld a,PAUSE_TEXT_W
+                ld c,c
+                xor a
+                ld (hl),a
+                ld b,b
+                pop hl
+                pop de
+                push de
+                push hl
+                push de
+                pop hl
+                ld d,d
+                ld a,PAUSE_TEXT_W
+                ld c,c
+                xor a
+                ld (hl),a
+                ld b,b
+                pop hl
+                pop de
+                pop bc
+                pop af
+                inc a
+                djnz .rowLoop
+                ld a,#c0
+                out (Y_PORT),a
+                ei
+                pop af
+                out (EmmWin.P1),a
+                ret
 
 DrawText:
                 ld (DrawTextX),a
@@ -889,6 +1035,7 @@ SFX_ID_NONE     equ 0
 SFX_ID_HIT      equ 1
 SFX_ID_DIE      equ 2
 SFX_ID_POINT    equ 3
+SFX_SILENCE_TAIL_BLOCKS equ 3
 
 SfxInit:
                 xor a
@@ -896,26 +1043,35 @@ SfxInit:
                 ld (SfxQueue0),a
                 ld (SfxQueue1),a
                 ld (SfxServiceChunkCounter),a
+                ld (SfxSilenceBlocks),a
+                ld (SfxCblEnabled),a
                 ld bc,CBL_CTRL
                 out (c),a
-                ld bc,CBL_DATA
-.flush:         ld a,CBL_SILENCE
-                out (c),a
-                ld a,(SfxServiceChunkCounter)
-                dec a
-                ld (SfxServiceChunkCounter),a
-                jr nz,.flush
-                ld bc,CBL_CTRL
-                ld a,CBL_CTRL_RUN_11K_MONO
-                out (c),a
-                ret
+                jp SfxFlushCblBuffer
 
 SfxShutdown:
                 xor a
                 ld (SfxCurrentId),a
                 ld (SfxQueue0),a
                 ld (SfxQueue1),a
+                ld (SfxSilenceBlocks),a
+                ld (SfxCblEnabled),a
+                jp SfxHardQuenchCbl
+
+SfxFlushCblBuffer:
                 ld bc,CBL_CTRL
+                ld a,CBL_CTRL_RUN_11K_MONO
+                out (c),a
+                ld bc,CBL_DATA
+                ld hl,512
+.flush:         ld a,CBL_SILENCE
+                out (c),a
+                dec hl
+                ld a,h
+                or l
+                jr nz,.flush
+                ld bc,CBL_CTRL
+                xor a
                 out (c),a
                 ret
 
@@ -925,13 +1081,15 @@ SfxQueueHitDie:
                 ret z
                 cp SFX_ID_DIE
                 ret z
+                call SfxAbortCblPlayback
                 ld a,SFX_ID_HIT
                 ld (SfxQueue0),a
                 ld a,SFX_ID_DIE
                 ld (SfxQueue1),a
                 xor a
                 ld (SfxCurrentId),a
-                jp SfxStartNext
+                call SfxStartNext
+                jp SfxPrimePlayback
 
 SfxQueuePoint:
                 ld a,(SfxCurrentId)
@@ -940,9 +1098,13 @@ SfxQueuePoint:
                 ld a,(SfxQueue0)
                 and a
                 ret nz
+                ld a,(SfxCblEnabled)
+                and a
+                call nz,SfxAbortCblPlayback
                 ld a,SFX_ID_POINT
                 ld (SfxQueue0),a
-                jp SfxStartNext
+                call SfxStartNext
+                jp SfxPrimePlayback
 
 SfxStartNext:
                 ld a,(SfxCurrentId)
@@ -981,50 +1143,175 @@ SfxStartNext:
                 ld (SfxRemaining),de
                 ret
 
-SfxService:
-                ld a,(SfxCurrentId)
-                and a
-                call z,SfxStartNext
+SfxPrimePlayback:
                 ld a,(SfxCurrentId)
                 and a
                 ret z
-                ld a,SFX_CHUNK_BYTES
-                ld (SfxServiceChunkCounter),a
+                xor a
+                ld (SfxSilenceBlocks),a
+                ld bc,CBL_CTRL
+                ld a,CBL_CTRL_RUN_11K_MONO
+                out (c),a
+                ld b,2
+.primeLoop:     push bc
+                call SfxWriteCblBlock
+                pop bc
+                djnz .primeLoop
+.bitReady:
+                ld a,(SfxCurrentId)
+                and a
+                jr nz,.enable
+                ld a,(SfxSilenceBlocks)
+                and a
+                ret z
+.enable:
+                ld bc,CBL_CTRL
+                ld a,CBL_CTRL_RUN_11K_MONO_INT
+                out (c),a
+                ld a,1
+                ld (SfxCblEnabled),a
+                ret
+
+SfxHandleCblInterrupt:
+                ld a,(SfxCurrentId)
+                and a
+                jr nz,.loop
+                ld a,(SfxSilenceBlocks)
+                and a
+                jr nz,.loop
+                ld a,(SfxCblEnabled)
+                and a
+                ret z
+.loop:
+                ld a,#ff
+                in a,(#FE)
+                bit 7,a
+                jr z,.handled              ; FIFO no longer hungry -> full enough
+                ld a,(SfxCurrentId)
+                and a
+                jr nz,.writeSample
+                ld a,(SfxSilenceBlocks)
+                and a
+                jr nz,.writeSilence
+                call SfxStopCbl
+                jr .handled
+.writeSample:
+                call SfxWriteCblBlock
+                jr .loop                   ; re-check flag, keep filling
+.writeSilence:
+                call SfxWriteSilenceBlock
+                jr .loop
+.handled:
+                scf
+                ret
+
+SfxAbortCblPlayback:
+                xor a
+                ld (SfxCblEnabled),a
+                ld (SfxCurrentId),a
+                ld (SfxSilenceBlocks),a
+                call SfxHardQuenchCbl
+                ei
+                ret
+
+SfxStopCbl:
+                xor a
+                ld (SfxCblEnabled),a
+                ld (SfxCurrentId),a
+                ld (SfxSilenceBlocks),a
+                call SfxHardQuenchCbl
+                ret
+
+SfxHardQuenchCbl:
+                di
+                ld bc,CBL_CTRL
+                ld a,CBL_CTRL_RUN_11K_MONO_INT
+                out (c),a
+                ld bc,CBL_DATA
+                ld hl,512
+.flush:         ld a,CBL_SILENCE
+                out (c),a
+                dec hl
+                ld a,h
+                or l
+                jr nz,.flush
+                xor a
+                ld bc,CBL_CTRL
+                out (c),a
+                ret
+
+SfxWriteSilenceBlock:
+                ld bc,CBL_DATA                  ; C = CBL data port low byte (#4F)
+                ld b,SFX_CBL_CHUNK_BYTES
+                ld hl,SfxSilenceBuf
+.loop:          outi
+                jr nz,.loop
+                ld hl,SfxSilenceBlocks
+                ld a,(hl)
+                and a
+                ret z
+                dec (hl)
+                ret
+
+SfxWriteCblBlock:
+                in a,(EmmWin.P3)
+                push af
+                ld bc,CBL_DATA                  ; C = CBL data port low byte (#4F)
+                ld a,SFX_CBL_CHUNK_BYTES
+                ld (SfxServiceChunkCounter),a   ; bytes still to emit in this block
 .loadState:     ld a,(SfxCurrentPage)
                 out (EmmWin.P3),a
                 ld hl,(SfxCurrentPtr)
                 ld de,(SfxRemaining)
-                ld bc,CBL_DATA
-.loop:          ld a,d
+.segment:       ld a,d
                 or e
-                jr z,.finishSample
-                ld a,(hl)
-                out (c),a
-                inc hl
-                dec de
+                jr z,.sampleEnded               ; current sample exhausted
                 ld a,(SfxServiceChunkCounter)
-                dec a
-                ld (SfxServiceChunkCounter),a
-                jr nz,.loop
+                ld b,a                          ; n = bytes left in this block
+                ld a,d
+                or a
+                jr nz,.haveCount                ; remaining >= 256 > block -> n = block
+                ld a,e
+                cp b
+                jr nc,.haveCount                ; remaining >= block  -> n = block
+                ld b,e                          ; remaining < block   -> n = remaining
+.haveCount:     ld a,(SfxServiceChunkCounter)
+                sub b
+                ld (SfxServiceChunkCounter),a   ; block bytes left -= n
+                ld a,e
+                sub b
+                ld e,a
+                jr nc,.spanOk
+                dec d                           ; sample remaining -= n (16-bit)
+.spanOk:        ; B = n (1..128), C = #4F, HL -> sample page (#C000..), DE updated
+.write:         outi
+                jr nz,.write
+                ld a,(SfxServiceChunkCounter)
+                or a
+                jr nz,.sampleEnded              ; block not full -> sample ran out, chain
                 ld (SfxCurrentPtr),hl
                 ld (SfxRemaining),de
+                pop af
+                out (EmmWin.P3),a
                 ret
-.finishSample:  xor a
+.sampleEnded:   xor a
                 ld (SfxCurrentId),a
                 call SfxStartNext
                 ld a,(SfxCurrentId)
                 and a
                 jr nz,.loadState
-                ld bc,CBL_DATA
-.silenceLoop:   ld a,(SfxServiceChunkCounter)
-                and a
-                ret z
-                ld a,CBL_SILENCE
-                out (c),a
                 ld a,(SfxServiceChunkCounter)
-                dec a
-                ld (SfxServiceChunkCounter),a
-                jr .silenceLoop
+                and a
+                jr z,.tailSet
+                ld b,a
+                ld hl,SfxSilenceBuf
+.tailFill:      outi
+                jr nz,.tailFill
+.tailSet:       ld a,SFX_SILENCE_TAIL_BLOCKS
+                ld (SfxSilenceBlocks),a
+                pop af
+                out (EmmWin.P3),a
+                ret
 
 Im2Handler:     di
                 push af
@@ -1041,6 +1328,7 @@ Im2Handler:     di
                 push de
                 push ix
                 push iy
+		call SfxHandleCblInterrupt
 		ld a,0
 .needChangePage: equ $-1
 		and a
@@ -1056,7 +1344,6 @@ Im2Handler:     di
 .musicEnabled:  equ $-1
                 and a
                 call nz,Player
-                call SfxService
                 pop af
                 out (EmmWin.P3),a
                 ld a,1
@@ -1099,7 +1386,15 @@ Counter:        db 0
 fHandler        db 0
 DrawTextX:      db 0
 DrawTextY:      db 0
+PauseExitRequested:
+                db 0
 FONT_BACKGROUND_INDEX equ 38
+PAUSE_TEXT_X    equ 72
+PAUSE_TEXT_Y    equ 104
+PAUSE_EXIT_TEXT_X equ 116
+PAUSE_EXIT_TEXT_Y equ 116
+PAUSE_TEXT_W    equ 176
+PAUSE_TEXT_H    equ 20
 FIELD_SCORE_X   equ 30
 FIELD_MEDAL_X   equ 4
 FIELD_MEDAL_TARGET_Y equ 231
@@ -1111,6 +1406,10 @@ SfxQueue0:      db 0
 SfxQueue1:      db 0
 SfxServiceChunkCounter:
                 db 0
+SfxSilenceBlocks:
+                db 0
+SfxCblEnabled:  db 0
+SfxSilenceBuf:  ds SFX_CBL_CHUNK_BYTES,CBL_SILENCE
 FieldMedalId:   db #ff
 FieldMedalAnim: db 0
 FieldMedalFirstY:
@@ -1122,6 +1421,10 @@ FieldMedalCurrentY:
 
 PressToPlayText:
                 db "PRESS TO PLAY",0
+PauseContinueText:
+                db "PRESS FIRE TO CONTINUE",0
+PauseExitText:
+                db "ESC TO EXIT",0
 
 MemoryBuffer:
 .memCity        db 0
@@ -1200,6 +1503,8 @@ GameOverRestartDelay:
                 db 0
 ReadyCounter:   db 150
 ReadyCleanupCounter:
+                db 0
+RestartTransitionRequest:
                 db 0
 BirdY:          db 100
 BirdFirstY:     db #ff
@@ -1310,6 +1615,7 @@ InitRenderCache:
 
 RunRenderCache:
                 call OpenCacheWindow
+                ei
                 call CacheRenderFrame
                 call CloseCacheWindow
                 ei
@@ -1329,6 +1635,7 @@ OpenCacheWindow:
 
 CloseCacheWindow:
                 push bc
+                di
                 in a,(CACHE_OFF_PORT)
                 ld a,SYS_MAP_DSS
                 out (SYS_PORT_OFF),a
