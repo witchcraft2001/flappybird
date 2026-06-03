@@ -14,6 +14,8 @@ set_im2:
         ld      (Im2DefaultVector),a
         ld      hl,Im2EmptyHandler
         ld      (Im2DefaultVector+1),hl
+        ld      hl,SfxCblIrqHandler
+        ld      (#80ff),hl
         ld      a,#80
         ld      i,a
         im      2
@@ -73,10 +75,7 @@ Im2OtherHandler:
         push    bc
         push    de
         push    hl
-        call    SfxHandleCblInterrupt
-        jr      c,.done
         call    KeysHandler
-.done:
         pop     hl
         pop     de
         pop     bc

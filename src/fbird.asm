@@ -1185,22 +1185,6 @@ SfxPrimePlayback:
                 xor a
                 ld (SfxSilenceBlocks),a
                 ld bc,CBL_CTRL
-                ld a,CBL_CTRL_RUN_11K_MONO
-                out (c),a
-                ld b,2
-.primeLoop:     push bc
-                call SfxWriteCblBlock
-                pop bc
-                djnz .primeLoop
-.bitReady:
-                ld a,(SfxCurrentId)
-                and a
-                jr nz,.enable
-                ld a,(SfxSilenceBlocks)
-                and a
-                ret z
-.enable:
-                ld bc,CBL_CTRL
                 ld a,CBL_CTRL_RUN_11K_MONO_INT
                 out (c),a
                 ld a,1
@@ -1208,37 +1192,40 @@ SfxPrimePlayback:
                 ret
 
 SfxHandleCblInterrupt:
-                ld a,(SfxCurrentId)
-                and a
-                jr nz,.loop
-                ld a,(SfxSilenceBlocks)
-                and a
-                jr nz,.loop
                 ld a,(SfxCblEnabled)
                 and a
                 ret z
-.loop:
-                ld a,#ff
-                in a,(#FE)
-                bit 7,a
-                jr z,.handled              ; FIFO no longer hungry -> full enough
                 ld a,(SfxCurrentId)
                 and a
                 jr nz,.writeSample
                 ld a,(SfxSilenceBlocks)
                 and a
                 jr nz,.writeSilence
-                call SfxStopCbl
-                jr .handled
-.writeSample:
-                call SfxWriteCblBlock
-                jr .loop                   ; re-check flag, keep filling
-.writeSilence:
-                call SfxWriteSilenceBlock
-                jr .loop
-.handled:
+                call SfxFinishCbl
                 scf
                 ret
+.writeSample:
+                call SfxWriteCblBlock
+                scf
+                ret
+.writeSilence:
+                call SfxWriteSilenceBlock
+                scf
+                ret
+
+SfxCblIrqHandler:
+                di
+                push af
+                push hl
+                push bc
+                push de
+                call SfxHandleCblInterrupt
+                pop de
+                pop bc
+                pop hl
+                pop af
+                ei
+                reti
 
 SfxAbortCblPlayback:
                 xor a
@@ -1255,6 +1242,16 @@ SfxStopCbl:
                 ld (SfxCurrentId),a
                 ld (SfxSilenceBlocks),a
                 call SfxHardQuenchCbl
+                ret
+
+SfxFinishCbl:
+                xor a
+                ld (SfxCblEnabled),a
+                ld (SfxCurrentId),a
+                ld (SfxSilenceBlocks),a
+                ld bc,CBL_CTRL
+                ld a,CBL_CTRL_IDLE
+                out (c),a
                 ret
 
 SfxHardQuenchCbl:
@@ -1370,8 +1367,7 @@ Im2Handler:     di
                 call ChangeVideoPage            ;flip first, right at the frame INT
                 xor a
                 ld (.needChangePage),a
-.skip:          call SfxHandleCblInterrupt      ;then refill the CBL FIFO
-                in a,(EmmWin.P3)
+.skip:          in a,(EmmWin.P3)
                 push af
                 ld hl,Counter
                 inc (hl)
