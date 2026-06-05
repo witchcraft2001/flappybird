@@ -49,3 +49,4 @@ Do not overwrite unrelated generated files or local build outputs unless the tas
   - `/Users/dmitry/dev/zx/sprinter/sources/DOOM2`
   - `/Users/dmitry/dev/zx/sprinter/games/titd/src`
   - `/Users/dmitry/dev/zx/sprinter/sources/sprinter-unzip`
+  - `/Users/dmitry/dev/zx/sprinter/sega-joy`

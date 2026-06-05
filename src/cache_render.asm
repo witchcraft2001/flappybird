@@ -325,14 +325,85 @@ CacheCheckSpace:
                 ld a,127
                 in a,(#FE)
                 bit 0,a
-                jr nz,.notPressed
+                jr nz,.tryJoy
                 ld a,#FE
                 in a,(#FE)
                 bit 0,a
-                jr z,.notPressed
+                jr z,.tryJoy            ; Caps+Space = Esc combo, not a flap
                 xor a
+                ret                     ; Space (no Caps) -> flap (z)
+.tryJoy:        call CacheCheckJoystickFire
+                jr z,.flap
+                ld a,1
+                ret                     ; nothing pressed (nz)
+.flap:          xor a
+                ret                     ; joystick fire/up -> flap (z)
+
+; Read Sega/Kempston while running from WIN0/SRAM cache. In this context the
+; external joystick is reachable at #07, not #1F. This mirrors SJTEST's cache
+; poller and leaves Sega pads in normal mode after cycle 9.
+CacheCheckJoystickFire:
+                push bc
+                push de
+                push hl
+                call CacheJoySelHigh    ; cycle 1 (stale)
+                in a,(KEMP_PORT_CACHE)
+                call CacheJoySelLow     ; cycle 2 -> Start/A + connected bits
+                in a,(KEMP_PORT_CACHE)
+                and %00111111
+                ld h,a
+                call CacheJoySelHigh    ; cycle 3 -> directions/B/C
+                in a,(KEMP_PORT_CACHE)
+                and %00111111
+                ld l,a
+                call CacheJoySelLow     ; cycle 4
+                call CacheJoySelHigh    ; cycle 5
+                call CacheJoySelLow     ; cycle 6
+                in a,(KEMP_PORT_CACHE)
+                call CacheJoySelHigh    ; cycle 7
+                in a,(KEMP_PORT_CACHE)
+                call CacheJoySelLow     ; cycle 8
+                in a,(KEMP_PORT_CACHE)
+                call CacheJoySelHigh    ; cycle 9, back to normal mode
+                ld a,h
+                and %00000001           ; connected bit from cycle 2
+                jr z,.idle
+                ld a,l
+                and %00000011           ; impossible Left+Right -> floating
+                cp %00000011
+                jr z,.idle
+                ld a,l
+                and %00001100           ; impossible Down+Up -> floating
+                cp %00001100
+                jr z,.idle
+                ld a,l
+                and JOY_FLAP_MASK       ; B/Fire or Up
+                jr z,.idle
+                pop hl
+                pop de
+                pop bc
+                xor a                   ; pressed -> z
                 ret
-.notPressed:    ld a,1
+.idle:          pop hl
+                pop de
+                pop bc
+                ld a,1                  ; idle/absent -> nz
+                or a
+                ret
+
+CacheJoySelHigh:
+                ld a,5
+                out (SIO_CMD_B),a
+                ld a,SEGA_SEL_HIGH
+                out (SIO_CMD_B),a
+                jr CacheJoySettle
+CacheJoySelLow:
+                ld a,5
+                out (SIO_CMD_B),a
+                ld a,SEGA_SEL_LOW
+                out (SIO_CMD_B),a
+CacheJoySettle: ld b,SEGA_SETTLE
+.sloop:         djnz .sloop
                 ret
 
 CacheUpdateBirdState:

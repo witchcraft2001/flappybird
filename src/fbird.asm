@@ -93,7 +93,12 @@ main:	        di
                 call LoadResourceList
                 jp c,.error
                 call DrawPressToPlay
+                ld de,Im2Handler
+                call set_im2            ; start 50Hz IM2 early so the joystick is polled
+                                        ; on the title too (music stays off until PlayerInit)
                 call WaitTitlePress
+                xor a
+                ld (JoyFire),a          ; do not carry the title Fire edge into gameplay
                 ld hl,TitlePalette+1
                 ld de,TempPal
                 ld a,(TitlePalette)
@@ -105,8 +110,6 @@ main:	        di
                 call FadePallete
                 ld hl,TempPal
                 call ResetPallete
-                ld de,Im2Handler
-                call set_im2
                 call PlayerInit
                 call SfxInit
                 call InitRenderCache
@@ -169,8 +172,12 @@ main:	        di
                 jp .loop
 
 .exit:
+                di
+                ld a,#03                ; stop CTC timers (sw reset + INT off) so the
+                out (CTC_CH2),a         ; extra 50Hz IM2 source doesn't derail the next
+                out (CTC_CH3),a         ; program after returning to DSS
                 in a,(RGMOD)
-                and 1                
+                and 1
                 call nz,ChangeVideoPage
                 ; ld hl,Palette+1
                 ; ld de,TempPal
@@ -248,6 +255,17 @@ WaitVsync:      di
                 ld a,(Im2Handler.vsyncFlag)
                 and a
                 jr z,.loop
+                ; SDK-style: flip the rendered page here, right at the frame boundary,
+                ; so a slow (DI) render cannot defer the flip into the visible area.
+                ld a,(Im2Handler.needChangePage)
+                and a
+                jr z,.noflip
+                call ChangeVideoPage
+                xor a
+                ld (Im2Handler.needChangePage),a
+.noflip:        ; Poll from the main DRAM code path. Kempston/Sega is #1F here;
+                ; #07 is only for code executed from WIN0/SRAM cache.
+                call PollJoystick
                 ei
                 ret
 
@@ -609,10 +627,11 @@ DrawFontGlyph:
 WaitTitlePress:
                 xor a
                 ld (KeyPressed),a
-.loop:          call KeysHandler
-                call CheckSpace
+.loop:          call WaitVsync          ; frame-sync; polls joystick after the halt.
+                                        ; Keyboard is serviced by the IM2 handler now.
+                call CheckSpace          ; #FE Space + cached joystick fire
                 ret z
-                ld a,(KeyPressed)
+                ld a,(KeyPressed)        ; any PS/2 key (set by the keyboard IRQ)
                 and a
                 jr z,.loop
                 ret
@@ -1364,10 +1383,7 @@ Im2Handler:     di
 .needChangePage: equ $-1
 		and a
 		jr z,.skip
-                call ChangeVideoPage            ;flip first, right at the frame INT
-                xor a
-                ld (.needChangePage),a
-.skip:          in a,(EmmWin.P3)
+.skip:          in a,(EmmWin.P3)                ;flip done in main loop after WaitVsync
                 push af
                 ld hl,Counter
                 inc (hl)
@@ -1379,7 +1395,6 @@ Im2Handler:     di
                 out (EmmWin.P3),a
                 ld a,1
                 ld (.vsyncFlag),a
-                jp .end
 .end:           pop iy
                 pop ix
                 pop de
@@ -1537,6 +1552,9 @@ ReadyCleanupCounter:
                 db 0
 RestartTransitionRequest:
                 db 0
+JoyFire:        db 0            ; Sega/Kempston fire|up edge, polled once per frame
+JoyStart:       db 0            ; Sega Start button (-> Esc/pause)
+JoyFirePrev:    db 0            ; previous raw fire|up level for edge detection
 BirdY:          db 100
 BirdFirstY:     db #ff
 BirdSecondY:    db #ff
