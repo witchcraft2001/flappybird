@@ -1434,7 +1434,6 @@ DrawTextX:      db 0
 DrawTextY:      db 0
 PauseExitRequested:
                 db 0
-FONT_BACKGROUND_INDEX equ 38
 PAUSE_TEXT_X    equ 72
 PAUSE_TEXT_Y    equ 104
 PAUSE_EXIT_TEXT_X equ 116

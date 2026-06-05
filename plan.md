@@ -8,14 +8,13 @@ time in per-row CPU copies and in work that does not actually change every frame
 
 ## Prioritized work
 
-1. `DrawFontGlyph` still performs software transparency checks (`cp FONT_BACKGROUND_INDEX`)
-   per pixel for title/pause text. Rework it as a high-priority cleanup: use hardware
-   transparency where safe, or preconverted font data and unrolled/`ldi` row copies so
-   text drawing does not keep a slow per-pixel branch path.
+1. `DrawFontGlyph` no longer performs software transparency checks per pixel; it draws
+   through the transparent VRAM alias. Further cleanup, if needed, is limited to reducing
+   row-address setup for title/pause text.
 
 2. `CacheDrawTubeHead` is the biggest visible hot path. Tube bodies already use the
-   vertical accelerator path, but tube heads still use `ldir` with per-row stack saves.
-   Replace this with horizontal accelerator copies and remove most row-level stack work.
+   vertical accelerator path; tube heads now use an unrolled accelerator row copy.
+   Re-check frame timing before spending more code size here.
 
 3. `CacheDrawScore` currently redraws the bottom HUD every frame: score, high score,
    medal, footer, and clear rectangles. These elements are mostly static. Add dirty

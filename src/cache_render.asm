@@ -1306,33 +1306,25 @@ CacheDrawTubeBody:
                 ret
 
 CacheDrawTubeHead:
-                ld (.y),a
-                ld a,TubeHeadHeight
-                ld (.rows),a
+                ex af,af'
                 di
-.loop:          ld a,0
-.y:             equ $-1
+                DUP 13
+                ex af,af'
                 out (Y_PORT),a
                 inc a
-                ld (.y),a
+                ex af,af'
                 ld d,d
-                ld a,0
-.len:           equ $-1
+                ld a,(CacheDrawTubeHead.len)
                 ld l,l
                 ld a,(hl)
                 ld (de),a
                 ld b,b
                 ld bc,TubeWidth
                 add hl,bc
-                ld a,0
-.rows:          equ $-1
-                dec a
-                ld (.rows),a
-                jr nz,.loop
-                ld a,(CacheDrawTubeHead.y)
-                ex af,af'
+                EDUP
                 ld b,0
-                ld a,(CacheDrawTubeHead.len)
+                ld a,0
+.len:           equ $-1
                 ld c,a
                 ret
 
