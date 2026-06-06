@@ -1594,37 +1594,53 @@ InitialTubes:
                 dw 100
                 db 70
                 db 80
+                db 0
+                db #ff
 
                 dw 256
                 db 30
                 db 80
+                db 0
+                db #ff
 
                 dw 412
                 db 110
                 db 80
+                db 0
+                db #ff
 
                 dw 568
                 db 90
                 db 80
+                db 0
+                db #ff
 
 Tubes:
                 dw 100
                 db 70
                 db 80
+                db 0
+                db #ff
 
                 dw 256
                 db 30
                 db 80
+                db 0
+                db #ff
 
                 dw 412
                 db 110
                 db 80
+                db 0
+                db #ff
 
                 dw 568
                 db 90
                 db 80
+                db 0
+                db #ff
 
-TUBE_ENTRY_SIZE equ 4
+TUBE_ENTRY_SIZE equ 6
 TUBES_COUNT     equ 4
 Tubes0          ds TUBES_COUNT*TUBE_ENTRY_SIZE,0
 Tubes1          ds TUBES_COUNT*TUBE_ENTRY_SIZE,0
@@ -1717,7 +1733,7 @@ TempPal:        ds 256*4,0
 RedTubeDn:      equ #C000
 RedTubeUp:      equ RedTubeDn+338
 RedTubeMiddle:  equ RedTubeUp+338
-GreenTubeDn:    equ RedTubeMiddle+194
+GreenTubeDn:    equ RedTubeMiddle+26
 GreenTubeUp:    equ GreenTubeDn+338
 GreenTubeMiddle: equ GreenTubeUp+338
 

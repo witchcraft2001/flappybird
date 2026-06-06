@@ -659,6 +659,8 @@ CacheDrawTubes:
                 xor a
                 ld (iy+2),a
                 ld (iy+3),a
+                ld (iy+4),a
+                ld (iy+5),a
                 jr .next
 .visible:
                 ld a,(ix+2)
@@ -666,6 +668,10 @@ CacheDrawTubes:
                 ld a,(ix+3)
                 ld (iy+3),a
                 ld (CacheDrawTubeGap),a
+                ld a,(ix+4)
+                ld (iy+4),a
+                ld a,(ix+5)
+                ld (iy+5),a
                 ld a,(ix+2)
                 call CacheDrawTube
 .next:          add ix,de
@@ -687,9 +693,27 @@ CacheRestoreTubes:
                 jr nc,.next
                 ld a,(ix+2)
                 and a
-                call nz,CacheRestoreTube
+                jr z,.next
+                ld a,(ix+4)
+                and a
+                jr z,.static
+                call CacheRestoreMovingTube
+                jr .next
+.static:        call CacheRestoreTube
 .next:          add ix,de
                 djnz .loop
+                ret
+
+CacheRestoreMovingTube:
+                ld de,0
+                ld (CacheRestoreTube.restoreOffset),de
+                ld de,TubeWidth
+                ld (CacheRestoreTube.restoreWidth),de
+                call CacheRestoreTube
+                ld de,TubeWidth-TubeWidthRestored
+                ld (CacheRestoreTube.restoreOffset),de
+                ld de,TubeWidthRestored
+                ld (CacheRestoreTube.restoreWidth),de
                 ret
 
 CacheTubeVisible:
@@ -733,6 +757,7 @@ CacheUpdateTube:
                 dec hl
                 ld (ix+0),l
                 ld (ix+1),h
+                call CacheUpdateMovingTubeY
                 ld a,h
                 cp #ff
                 jr nz,.checkOffscreen
@@ -884,7 +909,87 @@ CacheSpawnTube:
                 ld (ix+2),c
                 ld a,(CurrentTubeGap)
                 ld (ix+3),a
+                call CacheInitMovingTube
                 ret
+
+CacheUpdateMovingTubeY:
+                ld a,(ix+4)
+                and a
+                ret z
+                ld a,(Counter)
+                and 1
+                ret nz
+                push hl
+                push de
+                ld a,(ix+4)
+                inc a
+                cp 17
+                jr c,.phaseReady
+                ld a,1
+.phaseReady:    ld (ix+4),a
+                dec a
+                ld e,a
+                ld d,0
+                ld hl,MovingTubeYOffsets
+                add hl,de
+                ld a,(ix+5)
+                add a,(hl)
+                ld (ix+2),a
+                pop de
+                pop hl
+                ret
+
+CacheInitMovingTube:
+                ld a,#ff
+                ld (ix+5),a
+                xor a
+                ld (ix+4),a
+                call CacheShouldSpawnMovingTube
+                ret nc
+                ld a,(ix+2)
+                ld (ix+5),a
+                call CacheRandom
+                and 15
+                inc a
+                ld (ix+4),a
+                dec a
+                ld e,a
+                ld d,0
+                ld hl,MovingTubeYOffsets
+                add hl,de
+                ld a,(ix+5)
+                add a,(hl)
+                ld (ix+2),a
+                ret
+
+CacheShouldSpawnMovingTube:
+                call CacheRandom
+                ld b,a
+                ld a,(CurrentBiome)
+                cp BIOME_CITY_EVENING
+                jr z,.cityEvening
+                cp BIOME_CITY_NIGHT
+                jr z,.cityNight
+                cp BIOME_VILLAGE_DAY
+                jr z,.villageDay
+                cp BIOME_VILLAGE_NIGHT
+                jr z,.villageNight
+                ld a,26                 ; about 1/10
+                jr .check
+.cityEvening:   ld a,32                 ; 1/8
+                jr .check
+.cityNight:     ld a,43                 ; about 1/6
+                jr .check
+.villageDay:    ld a,64                 ; 1/4
+                jr .check
+.villageNight:  ld a,128                ; 1/2
+.check:         ld c,a
+                ld a,b
+                cp c                    ; carry set when random < threshold
+                ret
+
+MovingTubeYOffsets:
+                db 0,2,4,6,8,6,4,2,0,-2,-4,-6,-8,-6,-4,-2
 
 CacheFindRightmostTube:
                 ld hl,319
@@ -1058,6 +1163,7 @@ CacheRestoreTube:
 .notLeftClipped:
                 pop hl
                 ld de,TubeWidth-TubeWidthRestored
+.restoreOffset: equ $-2
                 add hl,de
                 push hl
 .positive:      ld bc,320
@@ -1067,6 +1173,7 @@ CacheRestoreTube:
                 pop hl
                 jr nc,.skip
                 ld bc,TubeWidthRestored
+.restoreWidth:  equ $-2
                 push bc
                 add hl,bc
                 ld de,320
@@ -1129,6 +1236,7 @@ CacheDrawTube:
                 out (EmmWin.P3),a
                 ld a,#5c
                 out (EmmWin.P1),a
+                call CacheSelectTubeSprites
                 push hl
                 bit 7,h
                 jr z,.positive
@@ -1156,6 +1264,7 @@ CacheDrawTube:
 .firstpg1:      push hl
                 push de
                 ld bc,RedTubeMiddle
+.srcNegMiddle:  equ $-2
                 add hl,bc
                 ld (.middle),hl
                 ex af,af'
@@ -1172,6 +1281,7 @@ CacheDrawTube:
                 push de
                 push af
                 ld bc,RedTubeDn
+.srcNegDown:    equ $-2
                 add hl,bc
                 call CacheDrawTubeHead
                 pop af
@@ -1181,6 +1291,7 @@ CacheDrawTube:
                 ld a,(CacheDrawTubeGap)
                 add a,b
                 ld bc,RedTubeUp
+.srcNegUp:      equ $-2
                 add hl,bc
                 push de
                 push af
@@ -1233,6 +1344,7 @@ CacheDrawTube:
 .firstpg:       add hl,de
                 ex hl,de
                 ld hl,RedTubeDn
+.srcPosDown:    equ $-2
                 ex af,af'
                 push af
                 push de
@@ -1245,6 +1357,7 @@ CacheDrawTube:
                 ld c,a
                 xor a
                 ld hl,RedTubeMiddle
+.srcPosMiddleTop: equ $-2
                 pop de
                 push bc
                 call CacheDrawTubeBody
@@ -1264,6 +1377,7 @@ CacheDrawTube:
                 ld b,a
                 pop af
                 ld hl,RedTubeMiddle
+.srcPosMiddleBottom: equ $-2
                 call CacheDrawTubeBody
                 pop af
                 pop de
@@ -1271,6 +1385,7 @@ CacheDrawTube:
                 ld a,(CacheDrawTubeGap)
                 add a,b
                 ld hl,RedTubeUp
+.srcPosUp:      equ $-2
                 call CacheDrawTubeHead
 .exit:          pop af
                 out (EmmWin.P3),a
@@ -1281,6 +1396,32 @@ CacheDrawTube:
                 jr .exit
 .skipNegative:  pop de
                 jr .exit
+
+CacheSelectTubeSprites:
+                push hl
+                ld a,(ix+4)
+                and a
+                jr nz,.green
+                ld hl,RedTubeDn
+                ld (CacheDrawTube.srcNegDown),hl
+                ld (CacheDrawTube.srcPosDown),hl
+                ld hl,RedTubeUp
+                ld (CacheDrawTube.srcNegUp),hl
+                ld (CacheDrawTube.srcPosUp),hl
+                ld hl,RedTubeMiddle
+                jr .storeMiddle
+.green:         ld hl,GreenTubeDn
+                ld (CacheDrawTube.srcNegDown),hl
+                ld (CacheDrawTube.srcPosDown),hl
+                ld hl,GreenTubeUp
+                ld (CacheDrawTube.srcNegUp),hl
+                ld (CacheDrawTube.srcPosUp),hl
+                ld hl,GreenTubeMiddle
+.storeMiddle:   ld (CacheDrawTube.srcNegMiddle),hl
+                ld (CacheDrawTube.srcPosMiddleTop),hl
+                ld (CacheDrawTube.srcPosMiddleBottom),hl
+                pop hl
+                ret
 
 CacheDrawTubeBody:
                 ex af,af'
@@ -1498,6 +1639,7 @@ CacheDrawFieldMedal:
 .placeholder:   ld a,FIELD_MEDAL_TARGET_Y
                 ld (FieldMedalCurrentY),a
 .draw:
+                call CacheRestoreFieldMedalBackground
                 in a,(RGMOD)
                 ld hl,FieldMedalFirstY
                 and 1
