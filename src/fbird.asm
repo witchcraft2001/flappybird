@@ -1646,15 +1646,15 @@ Tubes0          ds TUBES_COUNT*TUBE_ENTRY_SIZE,0
 Tubes1          ds TUBES_COUNT*TUBE_ENTRY_SIZE,0
 
 TubeYCityDay:
-                db 44,124,54,114,66,104,78,92
+                db 44,124,54,114,36,132,62,108
 TubeYCityEvening:
-                db 38,128,48,118,60,108,72,94
+                db 38,128,48,118,32,134,58,108
 TubeYCityNight:
-                db 34,132,44,122,56,112,70,96
+                db 34,132,44,122,30,138,56,112
 TubeYVillageDay:
-                db 40,130,50,120,62,110,76,96
+                db 40,130,50,120,34,136,60,110
 TubeYVillageNight:
-                db 32,134,42,124,54,114,72,98
+                db 32,134,42,124,54,114,36,136
 
 TubeIntervalCityDay:
                 db 164,156,152,148
@@ -1739,6 +1739,7 @@ GreenTubeMiddle: equ GreenTubeUp+338
 
 TubeWidth:      equ 26
 TubeWidthRestored: equ TubeWidth-20
+TubeRightMinVisible: equ 4
 TubeHeadHeight: equ 13
 
 AppDir:	        equ ($/80h)*80h+80h

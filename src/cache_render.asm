@@ -726,7 +726,7 @@ CacheTubeVisible:
                 cp 1
                 jr nz,.notVisible
                 ld a,l
-                cp #40
+                cp 320-TubeRightMinVisible-256+1
                 ret c
                 jr .notVisible
 .negative:      ld a,h
@@ -899,6 +899,7 @@ CacheSpawnTube:
                 ld b,c
                 push hl
                 call CacheSelectTubeY
+                call CacheClampTubeYToCurrentGap
                 ld c,a
                 call CacheGetSpawnDistance
                 pop hl
@@ -934,6 +935,7 @@ CacheUpdateMovingTubeY:
                 add hl,de
                 ld a,(ix+5)
                 add a,(hl)
+                call CacheClampTubeYToTubeGap
                 ld (ix+2),a
                 pop de
                 pop hl
@@ -947,6 +949,7 @@ CacheInitMovingTube:
                 call CacheShouldSpawnMovingTube
                 ret nc
                 ld a,(ix+2)
+                call CacheClampMovingTubeBaseY
                 ld (ix+5),a
                 call CacheRandom
                 and 15
@@ -959,7 +962,44 @@ CacheInitMovingTube:
                 add hl,de
                 ld a,(ix+5)
                 add a,(hl)
+                call CacheClampTubeYToTubeGap
                 ld (ix+2),a
+                ret
+
+CacheClampTubeYToCurrentGap:
+                push bc
+                ld b,a
+                ld a,(CurrentTubeGap)
+                jr CacheClampTubeYWithGap
+
+CacheClampTubeYToTubeGap:
+                push bc
+                ld b,a
+                ld a,(ix+3)
+
+CacheClampTubeYWithGap:
+                ld c,a
+                ld a,220-TubeHeadHeight-1
+                sub c
+                cp b
+                jr nc,.ready
+                ld b,a
+.ready:         ld a,b
+                pop bc
+                ret
+
+CacheClampMovingTubeBaseY:
+                push bc
+                ld b,a
+                ld a,(ix+3)
+                ld c,a
+                ld a,220-TubeHeadHeight-1-8
+                sub c
+                cp b
+                jr nc,.ready
+                ld b,a
+.ready:         ld a,b
+                pop bc
                 ret
 
 CacheShouldSpawnMovingTube:
@@ -1087,11 +1127,18 @@ CacheSelectTubeY:
                 sub b
                 jr nc,.absReady
                 neg
-.absReady:      cp 24
+.absReady:      cp 40
                 jr nc,.useSelected
-                ld a,(TubeYIndex)
-                add a,4
-                and 7
+                call CacheRandom
+                and 3
+                add a,a
+                ld c,a
+                ld a,b
+                cp 84
+                ld a,c
+                jr nc,.setFallbackIndex
+                inc a
+.setFallbackIndex:
                 ld (TubeYIndex),a
                 call CacheSelectTubeYByIndex
 .useSelected:   pop bc
@@ -1229,6 +1276,7 @@ CacheRestoreTube:
 CacheDrawTube:
                 push bc
                 push de
+                call CacheClampTubeYToTubeGap
                 ex af,af'
                 in a,(EmmWin.P3)
                 push af
@@ -1306,6 +1354,7 @@ CacheDrawTube:
                 ld a,220
                 sub b
                 ld b,a
+                jp z,.exit
                 ex af,af'
                 call CacheDrawTubeBody
                 jr .exit
@@ -1376,9 +1425,11 @@ CacheDrawTube:
                 sub b
                 ld b,a
                 pop af
+                jr z,.skipBottomMiddle
                 ld hl,RedTubeMiddle
 .srcPosMiddleBottom: equ $-2
                 call CacheDrawTubeBody
+.skipBottomMiddle:
                 pop af
                 pop de
                 ld b,a
