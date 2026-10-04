@@ -1,3 +1,5 @@
+reserve 193 19 135 146
+reserve 194 23 161 25
 ..\cutted\sky_color.png
 ..\cutted\grass_color.png
 ..\cutted\wall_color.png
@@ -44,3 +46,4 @@
 ..\cutted\title_flappybird.png
 ..\cutted\gopanel.png
 transparent ..\font.png 38
+..\cutted\cityn.png

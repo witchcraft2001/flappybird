@@ -14,6 +14,10 @@ CacheRenderFrame:
                 jr z,.play
                 jp CacheRenderReady
 .play:
+                IFDEF AUTOTEST
+                xor a
+                ld (DbgLive+DBG_MODE),a
+                ENDIF
                 call CacheUpdateBirdState
                 call CacheUpdateCityPos
                 call CacheUpdateWayPos
@@ -26,12 +30,17 @@ CacheRenderFrame:
                 call CacheUpdateTubes
                 call CacheUpdateBirdCoord
                 call CacheCheckCollisions
+                call CacheRestoreFieldMedalBackground
                 call CacheDrawTubes
                 call CacheDrawBird
                 call CacheDrawScore
                 jp CacheFinishFrame
 
 CacheRenderReady:
+                IFDEF AUTOTEST
+                ld a,DBG_MODE_READY
+                ld (DbgLive+DBG_MODE),a
+                ENDIF
                 call CacheRestoreBirdBackground
                 call CacheRestoreFieldMedalBackground
                 call CacheDrawCity
@@ -47,6 +56,10 @@ CacheRenderReady:
                 jp CacheFinishFrame
 
 CacheRenderGameOver:
+                IFDEF AUTOTEST
+                ld a,DBG_MODE_GAMEOVER
+                ld (DbgLive+DBG_MODE),a
+                ENDIF
                 call CacheRestoreBirdBackground
                 call CacheRestoreFieldMedalBackground
                 call CacheDrawCity
@@ -59,6 +72,9 @@ CacheRenderGameOver:
                 call CacheDrawGameOverTitle
                 call CacheDrawGameOverPanel
 CacheFinishFrame:
+                IFDEF AUTOTEST
+                call CacheDbgRecord
+                ENDIF
                 ld a,1
                 ld (Im2Handler.needChangePage),a
                 ret
@@ -156,6 +172,10 @@ CacheCheckGameOverRestart:
                 ret
 
 CacheRestartGame:
+                xor a
+                ld (ThemeTransitionRequest),a
+                ld a,THEME_DAY
+                call CacheApplyTheme
                 call CacheClearPlayfieldPages
                 call CacheMarkHudDirty
                 xor a
@@ -213,6 +233,16 @@ CacheRestartGame:
                 ret
 
 CacheSetGameOver:
+                IFDEF AUTOTEST
+                ld a,(DbgMortal)        ; immortal bird (until the test script says otherwise):
+                and a                   ; count the hit and keep playing
+                jr nz,.mortal
+                ld hl,(DbgHits)
+                inc hl
+                ld (DbgHits),hl
+                ret
+.mortal:
+                ENDIF
                 ld a,(GemeOver)
                 and a
                 ret nz
@@ -503,7 +533,7 @@ CacheDrawCity:
                 push af
                 ld a,#50
                 out (EmmWin.P1),a
-                ld a,(MemoryBuffer.memCity)
+                ld a,(CurrentCityPage)
                 out (EmmWin.P3),a
                 ld hl,#4000
                 in a,(RGMOD)
@@ -889,9 +919,79 @@ CacheUpdateBiomeParams:
                 ld (CurrentTubeInterval),a
                 ld a,80
 .setGap:        ld (CurrentTubeGap),a
+                call CacheRequestBiomeTheme
                 pop hl
                 pop af
                 ret
+
+; Request a faded day/night switch when the biome theme changes.
+CacheRequestBiomeTheme:
+                ld a,(CurrentBiome)
+                cp BIOME_CITY_NIGHT
+                jr z,.night
+                cp BIOME_VILLAGE_NIGHT
+                jr z,.night
+                ld a,THEME_DAY
+                jr .check
+.night:         ld a,THEME_NIGHT
+.check:         ld hl,CurrentTheme
+                cp (hl)
+                ret z
+                ld (PendingTheme),a
+                ld a,1
+                ld (ThemeTransitionRequest),a
+                ret
+
+; A - theme
+CacheApplyTheme:
+                ld (CurrentTheme),a
+                ld (PendingTheme),a
+                cp THEME_NIGHT
+                jr z,.night
+                ld a,(MemoryBuffer.memCity)
+                ld (CurrentCityPage),a
+                ld a,DAY_SKY_COLOR
+                ld (ThemeSkyColor),a
+                ld a,DAY_GRASS_COLOR
+                ld (ThemeGrassColor),a
+                ret
+.night:         ld a,(MemoryBuffer.memCityNight)
+                ld (CurrentCityPage),a
+                ld a,NIGHT_SKY_COLOR
+                ld (ThemeSkyColor),a
+                ld a,NIGHT_GRASS_COLOR
+                ld (ThemeGrassColor),a
+                ret
+
+; Called with the palette faded out: swap theme and clear both pages.
+CacheSwitchTheme:
+                xor a
+                ld (ThemeTransitionRequest),a
+                ld a,(PendingTheme)
+                call CacheApplyTheme
+                call CacheClearPlayfieldPages
+                call CacheMarkHudDirty
+                call CacheResetRenderHistory
+                ld a,#ff
+                ld (FieldMedalFirstY),a
+                ld (FieldMedalSecondY),a
+                ret
+
+; Redraw the current state into the back page without advancing game logic.
+CacheRedrawFrame:
+                IFDEF AUTOTEST
+                ld a,DBG_MODE_REDRAW
+                ld (DbgLive+DBG_MODE),a
+                ENDIF
+                call CacheRestoreBirdBackground
+                call CacheDrawCity
+                call CacheDrawWay
+                call CacheRestoreTubes
+                call CacheRestoreFieldMedalBackground
+                call CacheDrawTubes
+                call CacheDrawBird
+                call CacheDrawScore
+                jp CacheFinishFrame
 
 CacheSpawnTube:
                 push ix
@@ -982,7 +1082,12 @@ CacheClampTubeYWithGap:
                 ld a,220-TubeHeadHeight-1
                 sub c
                 cp b
+                jr nc,.checkMin
+                ld b,a
+.checkMin:      ld a,b
+                cp TubeMinY
                 jr nc,.ready
+                ld a,TubeMinY
                 ld b,a
 .ready:         ld a,b
                 pop bc
@@ -996,7 +1101,12 @@ CacheClampMovingTubeBaseY:
                 ld a,220-TubeHeadHeight-1-8
                 sub c
                 cp b
+                jr nc,.checkMin
+                ld b,a
+.checkMin:      ld a,b
+                cp TubeMinY+8
                 jr nc,.ready
+                ld a,TubeMinY+8
                 ld b,a
 .ready:         ld a,b
                 pop bc
@@ -1173,6 +1283,7 @@ CacheSelectTubeYByIndex:
 CacheRandom:
                 push bc
                 ld a,r
+                and #7f                 ; R bit 7 is whatever the last LD R,A left there
                 ld b,a
                 ld a,(RandomSeed)
                 rrca
@@ -1690,7 +1801,6 @@ CacheDrawFieldMedal:
 .placeholder:   ld a,FIELD_MEDAL_TARGET_Y
                 ld (FieldMedalCurrentY),a
 .draw:
-                call CacheRestoreFieldMedalBackground
                 in a,(RGMOD)
                 ld hl,FieldMedalFirstY
                 and 1
@@ -2335,9 +2445,10 @@ CacheClearReadyOverlaySky:
                 and 1
                 jr nz,.firstTitle
                 ld hl,#4140+112
-.firstTitle:    ld a,112
+.firstTitle:    ld a,(ThemeSkyColor)
+                ld c,a
+                ld a,112
                 ld b,25
-                ld c,0
                 ld e,96
                 call CacheClearSkyRect
                 in a,(RGMOD)
@@ -2345,9 +2456,10 @@ CacheClearReadyOverlaySky:
                 and 1
                 jr nz,.firstDigit
                 ld hl,#4140+152
-.firstDigit:    ld a,144
+.firstDigit:    ld a,(ThemeSkyColor)
+                ld c,a
+                ld a,144
                 ld b,20
-                ld c,0
                 ld e,16
                 call CacheClearSkyRect
                 pop af
@@ -2443,14 +2555,16 @@ CacheClearPlayfieldPages:
                 ei
                 ret
 .clearPage:     push hl
+                ld a,(ThemeSkyColor)
+                ld c,a
                 ld b,150
-                ld c,0
                 ld e,0
                 call .clearRows
                 pop hl
                 push hl
+                ld a,(ThemeGrassColor)
+                ld c,a
                 ld b,70
-                ld c,1
                 ld e,150
                 call .clearRows
                 pop hl
@@ -2523,6 +2637,92 @@ CacheRestoreRect:
                 pop af
                 out (EmmWin.P3),a
                 ret
+
+                IFDEF AUTOTEST
+; Autotest build only (tools/mame_fbird.lua): the state each page was drawn with.
+; The records live in the SRAM cache so the emulator script can read them at any time.
+DBG_SEQ         equ 0                   ; dw frame number
+DBG_MODE        equ 2
+DBG_THEME       equ 3
+DBG_CITY_POS    equ 4
+DBG_WAY_POS     equ 5
+DBG_BIRD_FRAME  equ 6
+DBG_BIRD_Y      equ 7
+DBG_SCORE       equ 8                   ; dw
+DBG_HIGH_SCORE  equ 10                  ; dw
+DBG_MEDAL_ID    equ 12
+DBG_MEDAL_Y     equ 13                  ; #ff - not drawn on this page
+DBG_BIOME       equ 14
+DBG_GAP         equ 15
+DBG_HITS        equ 16                  ; dw
+DBG_READY       equ 18
+DBG_TUBES       equ 19
+DBG_REC_SIZE    equ DBG_TUBES+TUBES_COUNT*TUBE_ENTRY_SIZE
+DBG_MODE_PLAY   equ 0
+DBG_MODE_READY  equ 1
+DBG_MODE_GAMEOVER equ 2
+DBG_MODE_REDRAW equ 3
+
+CacheDbgRecord:
+                ld hl,(DbgLive+DBG_SEQ)
+                inc hl
+                ld (DbgLive+DBG_SEQ),hl
+                ld a,(CurrentTheme)
+                ld (DbgLive+DBG_THEME),a
+                ld a,(CacheDrawCity.pos)
+                ld (DbgLive+DBG_CITY_POS),a
+                ld a,(CacheDrawWay.pos)
+                ld (DbgLive+DBG_WAY_POS),a
+                ld a,(GemeOver)
+                and a
+                ld a,3
+                jr nz,.birdFrameReady
+                ld a,(CacheUpdateBirdState.state)
+.birdFrameReady:
+                ld (DbgLive+DBG_BIRD_FRAME),a
+                ld a,(BirdY)
+                ld (DbgLive+DBG_BIRD_Y),a
+                ld hl,(Score)
+                ld (DbgLive+DBG_SCORE),hl
+                ld hl,(HighScore)
+                ld (DbgLive+DBG_HIGH_SCORE),hl
+                ld a,(FieldMedalId)
+                ld (DbgLive+DBG_MEDAL_ID),a
+                ld a,(CurrentBiome)
+                ld (DbgLive+DBG_BIOME),a
+                ld a,(CurrentTubeGap)
+                ld (DbgLive+DBG_GAP),a
+                ld hl,(DbgHits)
+                ld (DbgLive+DBG_HITS),hl
+                ld a,(ReadyCounter)
+                ld (DbgLive+DBG_READY),a
+                in a,(RGMOD)
+                and 1
+                ld a,(FieldMedalFirstY)
+                ld hl,Tubes0
+                ld de,DbgPage0
+                jr nz,.pageReady
+                ld a,(FieldMedalSecondY)
+                ld hl,Tubes1
+                ld de,DbgPage1
+.pageReady:     ld (DbgLive+DBG_MEDAL_Y),a
+                push de
+                ld de,DbgLive+DBG_TUBES
+                ld bc,TUBES_COUNT*TUBE_ENTRY_SIZE
+                ldir
+                pop de
+                ld hl,DbgLive
+                ld bc,DBG_REC_SIZE
+                ldir
+                ret
+
+DbgMagic:       db "FBAT"
+DbgHits:        dw 0
+DbgMortal:      db 0                    ; set by the test script to let the bird die
+DbgLive:        ds DBG_REC_SIZE,0
+DbgPage0:       ds DBG_REC_SIZE,0
+DbgPage1:       ds DBG_REC_SIZE,0
+                ENDIF
 
 CacheRenderCodeEnd:
                 ASSERT CacheRenderCodeEnd <= #4000

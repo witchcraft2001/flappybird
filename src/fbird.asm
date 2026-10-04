@@ -1,4 +1,9 @@
                 device zxspectrum128
+                IFDEF AUTOTEST
+                OUTPUT "../build/autotest/FBIRD.EXE"
+                ELSE
+                OUTPUT "FBIRD.EXE"
+                ENDIF
                 include "include/head.asm"
                 include "include/keyboard.asm"
                 include "include/dss_equ.asm"
@@ -8,40 +13,14 @@
 
 begin:		jp main
 
-                org #8181
+                ds #8181-$,0
 Im2DefaultVector:
                 jp Im2OtherHandler
 
 main:	        di
-;                ld (DOSLine+1),ix
+                ld a,(ix-3)             ; DSS loader mode: handle of the open EXE file
+                ld (fHandler),a
                 call SavePages
-                ld hl,AppDir
-                ld bc,256 + Dss.AppInfo
-                rst #10
-                ld hl,AppDir
-                ld de,AssetsDir
-                ld bc,128
-                ldir
-                ld hl,AssetsDir
-                push hl
-                call FindNextName
-                dec hl
-                ex de,hl
-                ld hl,AssetsDirName
-                ld bc,city-AssetsDirName
-                ldir
-                pop hl
-                push hl
-                ld c,Dss.ChDir
-                rst #10
-                jr nc,.next
-                ld hl,OpenDirErrorMessage
-                ld c,Dss.PChars
-                rst #10
-                pop hl
-                jp PrintError
-
-.next:          pop hl
                 ld hl,ResourcesLoadingMessage
                 ld c,Dss.PChars
                 rst #10
@@ -57,7 +36,6 @@ main:	        di
                 rst #08
                 pop af
                 ld de,MemoryBuffer.memTitle0
-                ld hl,title0
                 ld b,6
                 call LoadResourceList
                 jp c,.error
@@ -78,20 +56,24 @@ main:	        di
                 ld a,1
                 call SetPalette
                 ld de,MemoryBuffer
-                ld hl,city
                 ld b,7
                 call LoadResourceList
                 jp c,.error
                 ld de,MemoryBuffer.memMusic
-                ld hl,music
                 ld b,1
                 call LoadResourceList
                 jp c,.error
                 ld de,MemoryBuffer.memSfxHit
-                ld hl,sfxHit
                 ld b,3
                 call LoadResourceList
                 jp c,.error
+                ld de,MemoryBuffer.memCityNight
+                ld b,1
+                call LoadResourceList
+                jp c,.error
+                call CloseExeFile
+                ld a,(MemoryBuffer.memCity)
+                ld (CurrentCityPage),a
                 call DrawPressToPlay
                 ld de,Im2Handler
                 call set_im2            ; start 50Hz IM2 early so the joystick is polled
@@ -167,6 +149,9 @@ main:	        di
                 ld a,(RestartTransitionRequest)
                 and a
                 call nz,RestartGameWithFade
+                ld a,(ThemeTransitionRequest)
+                and a
+                call nz,ThemeTransitionWithFade
                 ; call Update0Screen
                 ; call UpdateScreenFlag
                 jp .loop
@@ -232,6 +217,89 @@ RestartGameWithFade:
                 ld a,1
                 jp SetPalette
 
+;Короткий fade out/in при смене темы день/ночь
+ThemeTransitionWithFade:
+                ld a,(GemeOver)
+                and a
+                jr z,.start
+                xor a                   ; restart returns to day anyway
+                ld (ThemeTransitionRequest),a
+                ret
+.start:         ld a,THEME_FADE_STEP
+.fadeOut:       push af
+                call SetPaletteDarkened
+                pop af
+                add a,THEME_FADE_STEP
+                jr nc,.fadeOut
+                ld a,255                ; black
+                call SetPaletteDarkened
+                call OpenCacheWindow
+                ei
+                call CacheSwitchTheme
+                call CloseCacheWindow
+                ei
+                call RunRedrawCache
+                call WaitVsync
+                call RunRedrawCache
+                call WaitVsync
+                ld a,256-THEME_FADE_STEP
+.fadeIn:        push af
+                call SetPaletteDarkened
+                pop af
+                sub THEME_FADE_STEP
+                jr nz,.fadeIn
+                call WaitVsync
+                ld hl,Palette+1
+                ld a,(Palette)
+                ld d,a
+                ld e,0
+                call SetPaletteBoth
+                ld hl,Palette+1
+                ld a,(Palette)
+                ld d,a
+                ld e,0
+                ld a,1
+                jp SetPalette
+
+;A - value subtracted from every colour component of the game palette (0 - as is, 255 - black).
+;One pass without multiplications, so a fade step always fits into a frame.
+SetPaletteDarkened:
+                ld c,a
+                ld hl,Palette+1
+                ld de,TempPal
+                ld a,(Palette)
+                ld b,a
+.entryLoop:     push bc
+                ld b,3
+.rgbLoop:       ld a,(hl)
+                sub c
+                jr nc,.store
+                xor a
+.store:         ld (de),a
+                inc hl
+                inc de
+                djnz .rgbLoop
+                xor a
+                ld (de),a
+                inc hl
+                inc de
+                pop bc
+                djnz .entryLoop
+                call WaitVsync
+                ld hl,TempPal
+                ld a,(Palette)
+                ld d,a
+                ld e,0
+                jp SetPaletteBoth
+
+RunRedrawCache:
+                call OpenCacheWindow
+                ei
+                call CacheRedrawFrame
+                call CloseCacheWindow
+                ei
+                ret
+
 RestartGameStateInCache:
                 call OpenCacheWindow
                 ei
@@ -293,7 +361,12 @@ PauseGame:
                 cp KEY_SPACE
                 jr z,.continue
                 jr .loop
-.continue:      call ClearPauseMessage
+.continue:      call ClearPauseMessageBack      ; hidden page: remove the text, redraw the
+                call RunRedrawCache             ; sprites it covered, show the page
+                call WaitVsync
+                call ClearPauseMessageBack      ; the same for the other page
+                call RunRedrawCache
+                call WaitVsync
                 xor a
                 ld (KeyPressed),a
                 ld (PauseExitRequested),a
@@ -303,56 +376,56 @@ PauseGame:
                 ld (PauseExitRequested),a
                 ret
 
+; Reads the resources that follow the resident part of the EXE, one per page.
+; Each record is: dw length, data (see the end of this file).
+;DE - list of page numbers
+;B - count
 LoadResourceList:
 .loop:          push de
                 push bc
-                push hl
-                call LoadResourceSilent
+                ld a,(de)
+                out (EmmWin.P3),a
+                ld hl,ResLength
+                ld de,2
+                call ReadExe
                 jr c,.error
-                pop hl
-                call FindNextName
+                ld de,(ResLength)
+                ld hl,ADDR
+                call ReadExe
+                jr c,.error
                 pop bc
                 pop de
                 inc de
                 djnz .loop
                 and a
                 ret
-.error:         pop hl
-                pop bc
+.error:         pop bc
                 pop de
                 scf
                 ret
 
-LoadResourceSilent:
-                ld  a,(de)
-                out (EmmWin.P3),a
-                jr LoadResource.open
-
-LoadResource:   ld  a,(de)
-                out (EmmWin.P3),a
-                push hl
-                ld c,Dss.PChars
-                rst #10
-                ld hl,CrLf
-                ld c,Dss.PChars
+;HL - buffer
+;DE - size
+;CF set on a DSS error or a short read
+ReadExe:        push de
+                ld a,(fHandler)
+                ld c,Dss.Read
                 rst #10
                 pop hl
-.open:
-                xor a
-	        ld c,Dss.Open
-	        rst #10
-	        ret c
-	        ld (fHandler),A
-                LD	HL,ADDR
-	        LD	DE,#4000
-	        LD	A,(fHandler)
-	        LD	C,Dss.Read
-	        RST	#10
-                push af
-                LD	A,(fHandler)
+                ret c
+                and a
+                sbc hl,de               ; requested - actually read
+                ret z
+                scf
+                ret
+
+; Called exactly once per run (either after the last LoadResourceList on the success path,
+; or from PrintError on a load failure) -- no "already closed" guard needed. DSS handles are
+; small numbers starting at 0 (sprinter_dss/DOS_FM.ASM GET_FM), so 0 is a valid handle and
+; cannot be used as an "unset/closed" sentinel.
+CloseExeFile:   ld a,(fHandler)
                 ld c,Dss.Close
                 rst #10
-                pop af
                 ret
 
 CopyPaletteToTemp:
@@ -444,41 +517,33 @@ DrawPauseMessage:
                 ld b,PAUSE_EXIT_TEXT_Y
                 jp DrawText
 
-ClearPauseMessage:
+; Стирает сообщение паузы на невидимой странице (спрайты поверх дорисует RunRedrawCache)
+ClearPauseMessageBack:
                 in a,(EmmWin.P1)
                 push af
                 ld a,#50
                 out (EmmWin.P1),a
                 ld hl,#4000+PAUSE_TEXT_X
-                ld de,#4140+PAUSE_TEXT_X
+                in a,(RGMOD)
+                and 1
+                jr nz,.pageReady
+                ld hl,#4140+PAUSE_TEXT_X
+.pageReady:     ld a,(ThemeSkyColor)
+                ld c,a
                 ld a,PAUSE_TEXT_Y
                 ld b,PAUSE_TEXT_H
 .rowLoop:       push af
                 out (Y_PORT),a
                 di
                 push bc
-                push de
                 push hl
                 ld d,d
                 ld a,PAUSE_TEXT_W
                 ld c,c
-                xor a
+                ld a,c
                 ld (hl),a
                 ld b,b
                 pop hl
-                pop de
-                push de
-                push hl
-                push de
-                pop hl
-                ld d,d
-                ld a,PAUSE_TEXT_W
-                ld c,c
-                xor a
-                ld (hl),a
-                ld b,b
-                pop hl
-                pop de
                 pop bc
                 pop af
                 inc a
@@ -1002,12 +1067,6 @@ CoordToAddrP1:  push de
                 pop de
                 ret
 
-FindNextName:   ld a,(hl)
-                inc hl
-                and a
-                ret z
-                jr FindNextName
-
 ;Сохранение номеров страниц при запуске
 SavePages:      ld hl,Pages
                 ld a,EmmWin.P0
@@ -1049,6 +1108,7 @@ FileReadError:
 PrintError:	    
                 ld c,Dss.PChars			;печатаем
                 rst #10
+                call CloseExeFile
                 call RestorePages
                 ld a,(MemoryDescriptor)
                 and a
@@ -1239,6 +1299,8 @@ SfxCblIrqHandler:
                 push bc
                 push de
                 call SfxHandleCblInterrupt
+                call KeysHandler        ; vector #FF is shared with the PS/2 keyboard IRQ:
+                                        ; read the SIO byte or the keyboard is dead
                 pop de
                 pop bc
                 pop hl
@@ -1420,9 +1482,6 @@ NotEnoughtMemoryMessage:
 FileReadErrorMessage:
                 db cr,lf,"Error: Can't read file!",cr,lf
 		db cr,lf,0
-OpenDirErrorMessage:
-                db cr,lf,"Error: Can't open ASSETS dir!"
-		db cr,lf,0
 
 ResourcesLoadingMessage:
                 db cr,lf,"Loading resources, please wait ...",cr,lf
@@ -1430,6 +1489,7 @@ CrLf:		db cr,lf,0
 
 Counter:        db 0
 fHandler        db 0
+ResLength:      dw 0
 DrawTextX:      db 0
 DrawTextY:      db 0
 PauseExitRequested:
@@ -1490,27 +1550,9 @@ MemoryBuffer:
 .memSfxHit      db 0
 .memSfxDie      db 0
 .memSfxPoint    db 0
+.memCityNight   db 0
                 db 0
-assetsBlocks    db 17
-
-AssetsDirName   db "ASSETS",0
-city            db "city.bin",0
-way             db "way.bin",0
-birds           db "birds.bin",0
-tubes           db "tubes.bin",0
-ui              db "ui.bin",0
-gameOverPanel   db "gopanel.bin",0
-font            db "font.bin",0
-title0          db "title.bin",0
-title1          db "title.b00",0
-title2          db "title.b01",0
-title3          db "title.b02",0
-title4          db "title.b03",0
-title5          db "title.b04",0
-music           db "music.bin",0
-sfxHit          db "hit.raw",0
-sfxDie          db "die.raw",0
-sfxPoint        db "point.raw",0
+assetsBlocks    db 18
 MemoryDescriptor:
                 db 0
 
@@ -1563,6 +1605,24 @@ BIOME_CITY_EVENING  equ 1
 BIOME_CITY_NIGHT    equ 2
 BIOME_VILLAGE_DAY   equ 3
 BIOME_VILLAGE_NIGHT equ 4
+
+THEME_DAY       equ 0
+THEME_NIGHT     equ 1
+DAY_SKY_COLOR   equ 0
+DAY_GRASS_COLOR equ 1
+NIGHT_SKY_COLOR equ 193         ; reserved in assets/res.txt
+NIGHT_GRASS_COLOR equ 194       ; reserved in assets/res.txt
+THEME_FADE_STEP equ 32          ; darkening per frame of the day/night fade (256/8 steps)
+
+CurrentTheme:   db THEME_DAY
+PendingTheme:   db THEME_DAY
+ThemeTransitionRequest:
+                db 0
+CurrentCityPage:
+                db 0
+ThemeSkyColor:  db DAY_SKY_COLOR
+ThemeGrassColor:
+                db DAY_GRASS_COLOR
 
 Score:          dw 0
 HighScore:      dw 0
@@ -1646,15 +1706,15 @@ Tubes0          ds TUBES_COUNT*TUBE_ENTRY_SIZE,0
 Tubes1          ds TUBES_COUNT*TUBE_ENTRY_SIZE,0
 
 TubeYCityDay:
-                db 44,124,54,114,36,132,62,108
+                db 12,124,24,114,8,132,38,108
 TubeYCityEvening:
-                db 38,128,48,118,32,134,58,108
+                db 10,128,22,118,8,134,36,108
 TubeYCityNight:
-                db 34,132,44,122,30,138,56,112
+                db 8,132,20,122,12,138,34,112
 TubeYVillageDay:
-                db 40,130,50,120,34,136,60,110
+                db 10,130,22,120,8,136,36,110
 TubeYVillageNight:
-                db 32,134,42,124,54,114,36,136
+                db 8,134,18,124,32,114,12,136
 
 TubeIntervalCityDay:
                 db 164,156,152,148
@@ -1739,19 +1799,49 @@ GreenTubeMiddle: equ GreenTubeUp+338
 
 TubeWidth:      equ 26
 TubeWidthRestored: equ TubeWidth-20
+TubeMinY:       equ 8
 TubeRightMinVisible: equ 4
 TubeHeadHeight: equ 13
 
-AppDir:	        equ ($/80h)*80h+80h
-AssetsDir:	equ AppDir + 128
 code_end:
+                ds (((code_end-#8100)+511)/512)*512-(code_end-#8100)
+resident_end:
+                ASSERT resident_end <= #BE00        ; the stack lives below #BFFF
 
+; Resources: the DSS loader reads only the part above, the rest is read by LoadResourceList.
+; Records go in the order of the load calls in main; the data of each is assembled at
+; #C000 (the page window it will be read into).
+                MACRO RESOURCE endLabel, file
+                org #BFFE
+                dw endLabel-#C000
+                incbin file
+endLabel:
+                ASSERT endLabel <= #10000
+                ENDM
 
-                org 0xC000
+                RESOURCE ResEnd0, "assets/title.bin"
+                RESOURCE ResEnd1, "assets/title.b00"
+                RESOURCE ResEnd2, "assets/title.b01"
+                RESOURCE ResEnd3, "assets/title.b02"
+                RESOURCE ResEnd4, "assets/title.b03"
+                RESOURCE ResEnd5, "assets/title.b04"
+                RESOURCE ResEnd6, "assets/city.bin"
+                RESOURCE ResEnd7, "assets/way.bin"
+                RESOURCE ResEnd8, "assets/birds.bin"
+                RESOURCE ResEnd9, "assets/tubes.bin"
+                RESOURCE ResEnd10, "assets/ui.bin"
+                RESOURCE ResEnd11, "assets/gopanel.bin"
+                RESOURCE ResEnd12, "assets/font.bin"
+
+                org #BFFE
+                dw PlayerEnd-PlayerStart
 PlayerStart:
                 include "pt3play.asm"
 MusicModule:
                 incbin "music/mus2.pt3"
 PlayerEnd:
-                savebin "assets/music.bin",PlayerStart,PlayerEnd-PlayerStart
-                savebin "FBIRD.EXE",start_addr,code_end-start_addr
+
+                RESOURCE ResEnd13, "assets/hit.raw"
+                RESOURCE ResEnd14, "assets/die.raw"
+                RESOURCE ResEnd15, "assets/point.raw"
+                RESOURCE ResEnd16, "assets/cityn.bin"

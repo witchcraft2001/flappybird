@@ -46,3 +46,4 @@ assets.png cutted\title_get_ready.png 136 112 96 25
 assets.png cutted\title_game_over.png 136 144 96 25
 assets.png cutted\title_flappybird.png 136 176 96 25
 assets.png cutted\gopanel.png 136 204 113 57
+assets.png cutted\cityn.png 0 264 276 39

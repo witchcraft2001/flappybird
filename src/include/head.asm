@@ -7,7 +7,7 @@ code_start:
 		db 0
 		dw 200h
 		dw 0
-		dw 0
+		dw resident_end-8100h   ; DSS loader mode: only the resident part is loaded
 		dw 0
 		dw 0
 		dw 0

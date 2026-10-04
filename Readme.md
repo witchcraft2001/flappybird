@@ -45,7 +45,7 @@ The computer is built on a standard computer tower configuration, using standard
 
 ### macOS / Cross-platform Build
 
-To build the executable and copy it with assets into `build/FBIRD.img` using `mtools`:
+To build the executable and copy it into `build/FBIRD.img` using `mtools`:
 
 ```bash
 make
@@ -55,7 +55,7 @@ Useful targets:
 
 ```bash
 make resources   # regenerate PNG cuts and binary resources with Python tools
-make exe         # assemble src/FBIRD.EXE and src/assets/music.bin
+make exe         # assemble the monoblock src/FBIRD.EXE (resources from src/assets are included)
 make image       # create build/FBIRD.img and copy files with mtools
 make clean       # remove build output
 ```
@@ -89,7 +89,7 @@ make_image.bat
 This will:
 - Create a disk image in `build/FBIRD.img`
 - Mount the image as drive X:
-- Copy the executable and assets to the image
+- Copy the executable to the image (it contains all the resources)
 - Unmount the image
 - Copy the image to ZXMAK2 emulator directory (if SPRINTER_EMULATOR environment variable is set)
 
