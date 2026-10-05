@@ -30,6 +30,7 @@ resources: cut
 	mkdir -p $(ASSETS_DIR)/resources
 	cd $(ASSETS_DIR)/resources && $(PYTHON) ../../tools/resources.py ../res.txt
 	cd $(ASSETS_DIR)/resources && $(PYTHON) ../../tools/resources.py ../title_res.txt
+	cd $(ASSETS_DIR)/resources && $(PYTHON) ../../tools/resources.py ../logo_res.txt
 	cat $(ASSETS_DIR)/resources/bird0.bin $(ASSETS_DIR)/resources/bird1.bin $(ASSETS_DIR)/resources/bird2.bin $(ASSETS_DIR)/resources/bird3.bin > $(ASSETS_DIR)/resources/birds.bin
 	cat $(ASSETS_DIR)/resources/tube0dn.bin $(ASSETS_DIR)/resources/tube0up.bin $(ASSETS_DIR)/resources/tube0md.bin $(ASSETS_DIR)/resources/tube1dn.bin $(ASSETS_DIR)/resources/tube1up.bin $(ASSETS_DIR)/resources/tube1md.bin > $(ASSETS_DIR)/resources/tubes.bin
 	cat $(ASSETS_DIR)/resources/big_digit*.bin $(ASSETS_DIR)/resources/small_digit*.bin $(ASSETS_DIR)/resources/coin*.bin $(ASSETS_DIR)/resources/medal_placeholder.bin $(ASSETS_DIR)/resources/ui_hand.bin $(ASSETS_DIR)/resources/title_get_ready.bin $(ASSETS_DIR)/resources/title_game_over.bin $(ASSETS_DIR)/resources/title_flappybird.bin > $(ASSETS_DIR)/resources/ui.bin
@@ -37,8 +38,9 @@ resources: cut
 	mkdir -p $(SRC_DIR)/assets
 	cp $(ASSETS_DIR)/resources/res_pal.asm $(SRC_DIR)/res_pal.asm
 	cp $(ASSETS_DIR)/resources/title_res_pal.asm $(SRC_DIR)/title_pal.asm
+	cp $(ASSETS_DIR)/resources/logo_res_pal.asm $(SRC_DIR)/logo_pal.asm
 	cp $(ASSETS_DIR)/resources/sfx_len.asm $(SRC_DIR)/sfx_len.asm
-	cp $(ASSETS_DIR)/resources/city.bin $(ASSETS_DIR)/resources/cityn.bin $(ASSETS_DIR)/resources/way.bin $(ASSETS_DIR)/resources/birds.bin $(ASSETS_DIR)/resources/tubes.bin $(ASSETS_DIR)/resources/ui.bin $(ASSETS_DIR)/resources/gopanel.bin $(ASSETS_DIR)/resources/font.bin $(ASSETS_DIR)/resources/title.bin $(ASSETS_DIR)/resources/title.b00 $(ASSETS_DIR)/resources/title.b01 $(ASSETS_DIR)/resources/title.b02 $(ASSETS_DIR)/resources/title.b03 $(ASSETS_DIR)/resources/title.b04 $(ASSETS_DIR)/resources/hit.raw $(ASSETS_DIR)/resources/die.raw $(ASSETS_DIR)/resources/point.raw $(SRC_DIR)/assets/
+	cp $(ASSETS_DIR)/resources/city.bin $(ASSETS_DIR)/resources/cityn.bin $(ASSETS_DIR)/resources/way.bin $(ASSETS_DIR)/resources/birds.bin $(ASSETS_DIR)/resources/tubes.bin $(ASSETS_DIR)/resources/ui.bin $(ASSETS_DIR)/resources/gopanel.bin $(ASSETS_DIR)/resources/font.bin $(ASSETS_DIR)/resources/title.bin $(ASSETS_DIR)/resources/title.b00 $(ASSETS_DIR)/resources/title.b01 $(ASSETS_DIR)/resources/title.b02 $(ASSETS_DIR)/resources/title.b03 $(ASSETS_DIR)/resources/title.b04 $(ASSETS_DIR)/resources/sprinter_logo.bin $(ASSETS_DIR)/resources/sprinter_logo.b00 $(ASSETS_DIR)/resources/sprinter_logo.b01 $(ASSETS_DIR)/resources/sprinter_logo.b02 $(ASSETS_DIR)/resources/hit.raw $(ASSETS_DIR)/resources/die.raw $(ASSETS_DIR)/resources/point.raw $(SRC_DIR)/assets/
 
 # FBIRD.EXE is a monoblock: the resources from src/assets are included into it
 exe: resources
@@ -75,4 +77,4 @@ run-test: test-image
 	$(MAME_ENV) tools/run_mame.sh run $(TEST_IMAGE)
 
 clean:
-	rm -rf $(BUILD_DIR) $(ASSETS_DIR)/cutted $(ASSETS_DIR)/resources $(SRC_DIR)/assets $(SRC_DIR)/res_pal.asm $(SRC_DIR)/title_pal.asm $(SRC_DIR)/sfx_len.asm $(SRC_DIR)/FBIRD.EXE $(SRC_DIR)/fbird.lst
+	rm -rf $(BUILD_DIR) $(ASSETS_DIR)/cutted $(ASSETS_DIR)/resources $(SRC_DIR)/assets $(SRC_DIR)/res_pal.asm $(SRC_DIR)/title_pal.asm $(SRC_DIR)/logo_pal.asm $(SRC_DIR)/sfx_len.asm $(SRC_DIR)/FBIRD.EXE $(SRC_DIR)/fbird.lst

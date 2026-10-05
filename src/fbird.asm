@@ -20,6 +20,9 @@ Im2DefaultVector:
 main:	        di
                 ld a,(ix-3)             ; DSS loader mode: handle of the open EXE file
                 ld (fHandler),a
+                ld hl,BannerMessage
+                ld c,Dss.PChars
+                rst #10
                 call SavePages
                 ld hl,ResourcesLoadingMessage
                 ld c,Dss.PChars
@@ -35,13 +38,37 @@ main:	        di
                 ld c,Bios.Emm_Fn5
                 rst #08
                 pop af
-                ld de,MemoryBuffer.memTitle0
-                ld b,6
+                ld de,MemoryBuffer.memTitle0    ; the logo goes into the title pages first
+                ld b,SPRINTER_LOGO_PAGES
                 call LoadResourceList
                 jp c,.error
                 call ChangeVideoMode
                 ld hl,TempPal
                 call ResetPallete
+                call DrawSprinterLogo
+                ld hl,LogoPalette+1
+                ld de,TempPal
+                ld a,(LogoPalette)
+                ld b,a
+                ld c,0
+                call UnfadePallete
+                ld de,MemoryBuffer.memTitle0    ; the logo is on screen, its pages are free
+                ld b,6
+                call LoadResourceList
+                jp c,.error
+                ei
+                ld b,SPRINTER_LOGO_PAUSE
+.logoPause:     halt
+                djnz .logoPause
+                ld hl,LogoPalette+1
+                ld de,TempPal
+                ld a,(LogoPalette)
+                call CopyPaletteToTemp
+                ld hl,TempPal
+                ld a,(LogoPalette)
+                ld d,a
+                ld e,0
+                call FadePallete
                 call DrawTitleScreen
                 ld hl,TitlePalette+1
                 ld de,TempPal
@@ -74,10 +101,14 @@ main:	        di
                 call CloseExeFile
                 ld a,(MemoryBuffer.memCity)
                 ld (CurrentCityPage),a
-                call DrawPressToPlay
+                call DrawPressToStart
                 ld de,Im2Handler
                 call set_im2            ; start 50Hz IM2 early so the joystick is polled
                                         ; on the title too (music stays off until PlayerInit)
+                IFDEF AUTOTEST
+                ld a,1
+                ld (DbgTitleReady),a
+                ENDIF
                 call WaitTitlePress
                 xor a
                 ld (JoyFire),a          ; do not carry the title Fire edge into gameplay
@@ -130,9 +161,6 @@ main:	        di
                 cp KEY_ESC
                 jp nz,.render
                 ld a,(GemeOver)
-                and a
-                jp nz,.render
-                ld a,(ReadyCounter)
                 and a
                 jp nz,.render
                 call PauseGame
@@ -464,7 +492,48 @@ DrawTitleScreen:
                 ld c,255
                 jp DrawTitleChunk
 
+SPRINTER_LOGO_H equ 200
+SPRINTER_LOGO_Y equ (256-SPRINTER_LOGO_H)/2
+SPRINTER_LOGO_PAGE_ROWS equ 16384/320   ; rows per file, as tools/resources.py splits images
+SPRINTER_LOGO_PAGES equ 4
+SPRINTER_LOGO_PAUSE equ 150             ; frames at full brightness: 3 s at 50 Hz
+
+; The 320x200 logo in the middle of both video pages; its first row is black, repeated it
+; fills the bands above and below.
+DrawSprinterLogo:
+                ld a,(MemoryBuffer.memTitle0)
+                ld b,SPRINTER_LOGO_Y
+                ld c,0
+                ld hl,0
+                call DrawImageRows
+                ld a,(MemoryBuffer.memTitle0)
+                ld b,SPRINTER_LOGO_PAGE_ROWS
+                ld c,SPRINTER_LOGO_Y
+                call DrawTitleChunk
+                ld a,(MemoryBuffer.memTitle1)
+                ld b,SPRINTER_LOGO_PAGE_ROWS
+                ld c,SPRINTER_LOGO_Y+SPRINTER_LOGO_PAGE_ROWS
+                call DrawTitleChunk
+                ld a,(MemoryBuffer.memTitle2)
+                ld b,SPRINTER_LOGO_PAGE_ROWS
+                ld c,SPRINTER_LOGO_Y+SPRINTER_LOGO_PAGE_ROWS*2
+                call DrawTitleChunk
+                ld a,(MemoryBuffer.memTitle3)
+                ld b,SPRINTER_LOGO_H-SPRINTER_LOGO_PAGE_ROWS*3
+                ld c,SPRINTER_LOGO_Y+SPRINTER_LOGO_PAGE_ROWS*3
+                call DrawTitleChunk
+                ld a,(MemoryBuffer.memTitle0)
+                ld b,256-SPRINTER_LOGO_Y-SPRINTER_LOGO_H
+                ld c,SPRINTER_LOGO_Y+SPRINTER_LOGO_H
+                ld hl,0
+                jp DrawImageRows
+
+;A - page, B - rows, C - first screen row
 DrawTitleChunk:
+                ld hl,320
+;HL - source step per row (0 repeats the first row of the page)
+DrawImageRows:
+                ld (.step),hl
                 ex af,af'
                 in a,(EmmWin.P1)
                 push af
@@ -489,7 +558,8 @@ DrawTitleChunk:
                 ld bc,320
                 ldir
                 pop hl
-                ld de,320
+                ld de,0
+.step:          equ $-2
                 add hl,de
                 pop bc
                 djnz .rowLoop
@@ -501,9 +571,9 @@ DrawTitleChunk:
                 out (EmmWin.P1),a
                 ret
 
-DrawPressToPlay:
-                ld hl,PressToPlayText
-                ld a,108
+DrawPressToStart:
+                ld hl,PressToStartText
+                ld a,(320-PRESS_TO_START_LEN*8)/2
                 ld b,180
                 jp DrawText
 
@@ -528,12 +598,15 @@ ClearPauseMessageBack:
                 and 1
                 jr nz,.pageReady
                 ld hl,#4140+PAUSE_TEXT_X
-.pageReady:     ld a,(ThemeSkyColor)
-                ld c,a
-                ld a,PAUSE_TEXT_Y
+.pageReady:     ld a,PAUSE_TEXT_Y
                 ld b,PAUSE_TEXT_H
 .rowLoop:       push af
                 out (Y_PORT),a
+                cp PLAYFIELD_GRASS_Y    ; the background of the row, as CacheClearPlayfieldPages fills it
+                ld a,(ThemeSkyColor)
+                jr c,.colorReady
+                ld a,(ThemeGrassColor)
+.colorReady:    ld c,a
                 di
                 push bc
                 push hl
@@ -1483,6 +1556,9 @@ FileReadErrorMessage:
                 db cr,lf,"Error: Can't read file!",cr,lf
 		db cr,lf,0
 
+BannerMessage:
+                db "FlappyBird by Dmitry Mikhalchenkov v.0.2.1",cr,lf,0
+
 ResourcesLoadingMessage:
                 db cr,lf,"Loading resources, please wait ...",cr,lf
 CrLf:		db cr,lf,0
@@ -1494,12 +1570,13 @@ DrawTextX:      db 0
 DrawTextY:      db 0
 PauseExitRequested:
                 db 0
-PAUSE_TEXT_X    equ 72
-PAUSE_TEXT_Y    equ 104
-PAUSE_EXIT_TEXT_X equ 116
-PAUSE_EXIT_TEXT_Y equ 116
-PAUSE_TEXT_W    equ 176
+PAUSE_TEXT_W    equ PAUSE_CONTINUE_LEN*8  ; the wider line; both are cleared as one box
+PAUSE_TEXT_X    equ (320-PAUSE_TEXT_W)/2
+PAUSE_TEXT_Y    equ 174                ; below the Get Ready banner and digit (rows 112..163)
+PAUSE_EXIT_TEXT_X equ (320-PAUSE_EXIT_LEN*8)/2
+PAUSE_EXIT_TEXT_Y equ PAUSE_TEXT_Y+12
 PAUSE_TEXT_H    equ 20
+PLAYFIELD_GRASS_Y equ 150               ; sky above, grass from here to the road (the city is drawn over it)
 FIELD_SCORE_X   equ 30
 FIELD_MEDAL_X   equ 4
 FIELD_MEDAL_TARGET_Y equ 231
@@ -1524,12 +1601,22 @@ FieldMedalSecondY:
 FieldMedalCurrentY:
                 db #ff
 
-PressToPlayText:
-                db "PRESS TO PLAY",0
+PressToStartText:
+                db "PRESS FIRE TO START"
+PRESS_TO_START_LEN equ $-PressToStartText
+                db 0
+                IFDEF AUTOTEST
+DbgTitleReady:  db 0                    ; set when the title waits for Fire (tools/mame_fbird.lua)
+                ENDIF
 PauseContinueText:
-                db "PRESS FIRE TO CONTINUE",0
+                db "PRESS FIRE TO CONTINUE"
+PAUSE_CONTINUE_LEN equ $-PauseContinueText
+                db 0
 PauseExitText:
-                db "ESC TO EXIT",0
+                db "START/ESC TO EXIT"
+PAUSE_EXIT_LEN  equ $-PauseExitText
+                db 0
+                ASSERT PAUSE_EXIT_LEN <= PAUSE_CONTINUE_LEN   ; ClearPauseMessageBack clears PAUSE_TEXT_W
 
 MemoryBuffer:
 .memCity        db 0
@@ -1600,12 +1687,6 @@ BirdY:          db 100
 BirdFirstY:     db #ff
 BirdSecondY:    db #ff
 
-BIOME_CITY_DAY      equ 0
-BIOME_CITY_EVENING  equ 1
-BIOME_CITY_NIGHT    equ 2
-BIOME_VILLAGE_DAY   equ 3
-BIOME_VILLAGE_NIGHT equ 4
-
 THEME_DAY       equ 0
 THEME_NIGHT     equ 1
 DAY_SKY_COLOR   equ 0
@@ -1640,11 +1721,12 @@ CacheHudDirtyFirst:
                 db 1
 CacheHudDirtySecond:
                 db 1
-CurrentBiome:   db BIOME_CITY_DAY
-CurrentTubeInterval:
-                db 156
-CurrentTubeGap:
-                db 80
+CurrentLevel:   db 0
+CurrentLevelParams:
+                dw LevelParams          ; -> 8-byte row in LevelParams for CurrentLevel
+ScoreInTheme:   db 0                    ; 0..49, counts up to the next day/night switch
+ThemeParity:    db 0                    ; 0 = day, 1 = night; toggles every 50 points
+CurrentTubeGap: db 80
 CacheDrawTubeGap:
                 db 80
 RandomSeed:     db #5a
@@ -1658,19 +1740,19 @@ InitialTubes:
                 db #ff
 
                 dw 256
-                db 30
+                db 50
                 db 80
                 db 0
                 db #ff
 
                 dw 412
-                db 110
+                db 80
                 db 80
                 db 0
                 db #ff
 
                 dw 568
-                db 90
+                db 56
                 db 80
                 db 0
                 db #ff
@@ -1683,19 +1765,19 @@ Tubes:
                 db #ff
 
                 dw 256
-                db 30
+                db 50
                 db 80
                 db 0
                 db #ff
 
                 dw 412
-                db 110
+                db 80
                 db 80
                 db 0
                 db #ff
 
                 dw 568
-                db 90
+                db 56
                 db 80
                 db 0
                 db #ff
@@ -1705,27 +1787,50 @@ TUBES_COUNT     equ 4
 Tubes0          ds TUBES_COUNT*TUBE_ENTRY_SIZE,0
 Tubes1          ds TUBES_COUNT*TUBE_ENTRY_SIZE,0
 
-TubeYCityDay:
-                db 12,124,24,114,8,132,38,108
-TubeYCityEvening:
-                db 10,128,22,118,8,134,36,108
-TubeYCityNight:
-                db 8,132,20,122,12,138,34,112
-TubeYVillageDay:
-                db 10,130,22,120,8,136,36,110
-TubeYVillageNight:
-                db 8,134,18,124,32,114,12,136
+; Tube Y tables, two levels per set. Even entries < TUBE_Y_SPLIT <= odd ones (CacheSelectTubeY
+; relies on it); the spread sets the height jumps: about 27, 37, 53, 68, 82 px on average.
+TUBE_Y_SPLIT    equ 72
+TubeYSet0:
+                db 50,80,56,74,46,86,60,78
+TubeYSet1:
+                db 44,86,50,80,40,92,56,74
+TubeYSet2:
+                db 36,96,44,88,30,102,50,82
+TubeYSet3:
+                db 28,104,36,96,22,112,44,88
+TubeYSet4:
+                db 20,112,30,104,14,120,38,96
 
-TubeIntervalCityDay:
-                db 164,156,152,148
-TubeIntervalCityEvening:
-                db 148,140,136,132
-TubeIntervalCityNight:
-                db 132,124,120,116
-TubeIntervalVillageDay:
-                db 116,108,104,100
-TubeIntervalVillageNight:
-                db 104,96,92,88
+; Score at which each level 1..LEVEL_MAX begins (level 0 covers score 0..LevelScores[0]-1).
+; All entries must stay below 256: CacheUpdateLevel compares the low byte of Score only.
+LevelScores:    db 10,25,50,75,100,125,150,175,200
+LEVEL_MAX       equ $-LevelScores       ; top level; LevelParams has LEVEL_MAX+1 rows
+
+; LEVEL_PARAMS_SIZE bytes per level: gap, moving-tube threshold (0..127, CacheRandom range),
+; 4 spawn intervals in px (one is picked at random), dw pointer to the tube-Y table.
+; Mirrored in tools/mame_fbird.lua (LEVEL_GAP, LEVEL_INTERVALS, TUBE_Y_SETS).
+LevelParams:
+                db 80,0,  164,156,152,148
+                dw TubeYSet0
+                db 80,13, 156,148,144,140
+                dw TubeYSet0
+                db 78,19, 148,140,136,132
+                dw TubeYSet1
+                db 76,26, 140,132,128,124
+                dw TubeYSet1
+                db 74,32, 132,124,120,116
+                dw TubeYSet2
+                db 72,38, 124,116,112,108
+                dw TubeYSet2
+                db 70,45, 120,112,108,104
+                dw TubeYSet3
+                db 68,51, 116,108,104,100
+                dw TubeYSet3
+                db 66,58, 108,100,96,92
+                dw TubeYSet4
+                db 64,64, 104,96,92,88
+                dw TubeYSet4
+LEVEL_PARAMS_SIZE equ 8                 ; CacheUpdateLevel multiplies by it with 3 x add hl,hl
 
 InitRenderCache:
                 call OpenCacheWindow
@@ -1788,6 +1893,8 @@ PaletteEnd:
 TitlePalette:
                 include "title_pal.asm"
 TitlePaletteEnd:
+LogoPalette:
+                include "logo_pal.asm"
 TempPal:        ds 256*4,0
                 
 RedTubeDn:      equ #C000
@@ -1819,6 +1926,10 @@ endLabel:
                 ASSERT endLabel <= #10000
                 ENDM
 
+                RESOURCE ResLogo0, "assets/sprinter_logo.bin"
+                RESOURCE ResLogo1, "assets/sprinter_logo.b00"
+                RESOURCE ResLogo2, "assets/sprinter_logo.b01"
+                RESOURCE ResLogo3, "assets/sprinter_logo.b02"
                 RESOURCE ResEnd0, "assets/title.bin"
                 RESOURCE ResEnd1, "assets/title.b00"
                 RESOURCE ResEnd2, "assets/title.b01"

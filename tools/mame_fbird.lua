@@ -5,10 +5,12 @@
 -- Every displayed frame is checked against a reference picture rendered here from the game state:
 -- the AUTOTEST build stores, per video page, the state the page was drawn with (DbgPage0/DbgPage1
 -- in the SRAM cache, layout DBG_* in src/cache_render.asm). Also checked: tube geometry and motion,
--- scoring, bird physics, the day/night theme against the score and the palette fade of the switch.
+-- scoring, bird physics, the day/night theme against the score and the palette fade of the switch,
+-- and before that the boot: the Sprinter logo fading in and out, then the title.
 --
 -- Environment: FB_SYM (symbols of the AUTOTEST build), FB_OUT (report, dumps, screenshots),
---              FB_ASSETS (src/assets), FB_PALETTE (src/res_pal.asm), FB_SCORE (score to play to),
+--              FB_ASSETS (src/assets), FB_PALETTE (src/res_pal.asm; logo_pal.asm and title_pal.asm
+--              are taken from the same directory), FB_SCORE (score to play to),
 --              FB_MAX_DUMPS (mismatching frames dumped as .act/.exp, default 12)
 -- Result: FB_OUT/report.txt ending with "RESULT: PASS|FAIL"; MAME exits.
 
@@ -25,7 +27,7 @@ local SYM = os.getenv("FB_SYM") or "build/autotest/fbird.sym"
 local OUT = os.getenv("FB_OUT") or "build/autotest"
 local ASSETS = os.getenv("FB_ASSETS") or "src/assets"
 local PALETTE = os.getenv("FB_PALETTE") or "src/res_pal.asm"
-local TARGET_SCORE = tonumber(os.getenv("FB_SCORE") or "90")
+local TARGET_SCORE = tonumber(os.getenv("FB_SCORE") or "110")
 local MAX_DUMPS = tonumber(os.getenv("FB_MAX_DUMPS") or "12")
 local EXE_CMD = "b:\\fbird\\fbird.exe"
 
@@ -70,11 +72,17 @@ local birds = load_bin("birds.bin")
 local tubes_bin = load_bin("tubes.bin")
 local ui = load_bin("ui.bin")
 
-local nominal = {}                       -- game palette: nominal[i] = {r, g, b}, i from 0
-for line in io.lines(PALETTE) do
-  local b, g, r = line:match("db%s+0x(%x%x),%s*0x(%x%x),%s*0x(%x%x),%s*0x%x%x")
-  if b then nominal[#nominal + 1] = { tonumber(r, 16), tonumber(g, 16), tonumber(b, 16) } end
+local function load_palette(path)        -- p[i] = {r, g, b}, i from 1, from a *_pal.asm
+  local p = {}
+  for line in io.lines(path) do
+    local b, g, r = line:match("db%s+0x(%x%x),%s*0x(%x%x),%s*0x(%x%x),%s*0x%x%x")
+    if b then p[#p + 1] = { tonumber(r, 16), tonumber(g, 16), tonumber(b, 16) } end
+  end
+  return p
 end
+local nominal = load_palette(PALETTE)    -- game palette
+local SRC_DIR = PALETTE:match("^(.*)/[^/]*$") or "."
+local logo_pal, title_pal = load_palette(SRC_DIR .. "/logo_pal.asm"), load_palette(SRC_DIR .. "/title_pal.asm")
 
 -- geometry of the frame (src/fbird.asm, src/cache_render.asm)
 local W, ROWS = 320, 231                 -- compared area: playfield and the road; the HUD rows are not modelled
@@ -95,13 +103,38 @@ local GRASS = { [0] = S("DAY_GRASS_COLOR"), [1] = S("NIGHT_GRASS_COLOR") }
 local MODE = { PLAY = S("DBG_MODE_PLAY"), READY = S("DBG_MODE_READY"), GAMEOVER = S("DBG_MODE_GAMEOVER"), REDRAW = S("DBG_MODE_REDRAW") }
 local TUBES, TUBE_SIZE = S("TUBES_COUNT"), S("TUBE_ENTRY_SIZE")
 
--- requirements checked (specs.md 7, 8): the visual theme and the tube parameters by score
-local function expected_theme(score) return ((score >= 25 and score < 50) or score >= 80) and 1 or 0 end
-local function expected_biome(score)
-  if score < 10 then return 0 elseif score < 25 then return 1 elseif score < 50 then return 2 elseif score < 80 then return 3 end
-  return 4
+-- requirements checked (specs.md 7, 8): the visual theme and the tube parameters by score.
+-- Theme cycles day/night every 50 points forever; difficulty has 10 levels, one per 25 points,
+-- capped at level 9 (score >= 200).
+local function expected_theme(score) return (score // 50) % 2 end
+local LEVEL_SCORES = { 10, 25, 50, 75, 100, 125, 150, 175, 200 }
+local function expected_level(score)
+  local level = 0
+  for _, s in ipairs(LEVEL_SCORES) do if score >= s then level = level + 1 end end
+  return level
 end
-local BIOME_GAP = { [0] = 80, 76, 72, 68, 64 }
+local LEVEL_GAP = { [0] = 80, 80, 78, 76, 74, 72, 70, 68, 66, 64 }
+local LEVEL_INTERVALS = { [0] = { 164, 156, 152, 148 }, { 156, 148, 144, 140 }, { 148, 140, 136, 132 },
+  { 140, 132, 128, 124 }, { 132, 124, 120, 116 }, { 124, 116, 112, 108 }, { 120, 112, 108, 104 },
+  { 116, 108, 104, 100 }, { 108, 100, 96, 92 }, { 104, 96, 92, 88 } }
+local TUBE_Y_SETS = { [0] = { 50, 80, 56, 74, 46, 86, 60, 78 }, { 44, 86, 50, 80, 40, 92, 56, 74 },
+  { 36, 96, 44, 88, 30, 102, 50, 82 }, { 28, 104, 36, 96, 22, 112, 44, 88 }, { 20, 112, 30, 104, 14, 120, 38, 96 } }
+local MEDAL_SCORE = { [0] = 25, 50, 100, 200 }   -- bronze, silver, gold, platinum
+
+-- CacheGetSpawnDistance: one of the level's intervals plus 0/8/16/24 for a height change, at most 176
+local function spawn_distance_ok(level, d)
+  for _, b in ipairs(LEVEL_INTERVALS[level]) do
+    for e = 0, 24, 8 do if math.min(b + e, 176) == d then return true end end
+  end
+  return false
+end
+-- CacheSelectTubeY + CacheClampTubeYToCurrentGap: a static tube's y is a table value, clamped
+local function static_y_ok(level, gap, y)
+  for _, v in ipairs(TUBE_Y_SETS[level // 2]) do
+    if math.max(math.min(v, FIELD_H - HEAD_H - 1 - gap), TUBE_MIN_Y) == y then return true end
+  end
+  return false
+end
 
 -- ---------------------------------------------------------------- game state
 local fast_off = 0                       -- cache address -> offset in the :fastram share
@@ -119,7 +152,7 @@ local function read_rec(page)
     page = page, seq = fu16(b + S("DBG_SEQ")), mode = fu8(b + S("DBG_MODE")), theme = fu8(b + S("DBG_THEME")),
     city = fu8(b + S("DBG_CITY_POS")), way = fu8(b + S("DBG_WAY_POS")), bird_frame = fu8(b + S("DBG_BIRD_FRAME")),
     bird_y = fu8(b + S("DBG_BIRD_Y")), score = fu16(b + S("DBG_SCORE")), high = fu16(b + S("DBG_HIGH_SCORE")),
-    medal_id = fu8(b + S("DBG_MEDAL_ID")), medal_y = fu8(b + S("DBG_MEDAL_Y")), biome = fu8(b + S("DBG_BIOME")),
+    medal_id = fu8(b + S("DBG_MEDAL_ID")), medal_y = fu8(b + S("DBG_MEDAL_Y")), level = fu8(b + S("DBG_LEVEL")),
     gap = fu8(b + S("DBG_GAP")), hits = fu16(b + S("DBG_HITS")), ready = fu8(b + S("DBG_READY")), tubes = {},
   }
   for i = 0, TUBES - 1 do
@@ -165,6 +198,17 @@ local function palette_dark()
     end
   end
   return d
+end
+
+-- The first n colours in VRAM are exactly pal (n = #pal), or all black when pal is nil.
+local function palette_is(pal, n)
+  for i = 0, (n or #pal) - 1 do
+    local a, m = i * 1024 + 0x3E0, pal and pal[i + 1]
+    for k = 1, 3 do
+      if vram:read_u8(a + k - 1) ~= (m and m[k] or 0) then return false end
+    end
+  end
+  return true
 end
 
 -- ---------------------------------------------------------------- reference picture
@@ -319,13 +363,31 @@ end
 -- ---------------------------------------------------------------- per-frame checks
 local st = {
   shown = 0, compared = 0, bad_frames = 0, slow = 0, spawned = 0, moving = 0, left_clip = 0, right_clip = 0,
-  overlap = 0, switches = {}, max_fall = 0, slow_at = {},
+  overlap = 0, switches = {}, max_fall = 0, slow_at = {}, medal_seen = {},
+  slot_level = {},                       -- tube slot -> level it was spawned at (nil: initial tube)
+  by_level = {},                         -- level -> { n = entered, moving = moving }
 }
 
+-- A tube slot was reused for a new tube: CacheSpawnTube put it a spawn distance to the right of
+-- max(319, the rightmost tube) as it was then; slots after this one were moved 1 px after it.
+local function check_spawn(rec, i)
+  local base = 319
+  for j, t in ipairs(rec.tubes) do
+    local x = j > i and t.x + 1 or t.x
+    if j ~= i and x >= 0 and x > base then base = x end
+  end
+  local d = rec.tubes[i].x - base
+  if not spawn_distance_ok(rec.level, d) then
+    fail("tube-spawn", "frame %d: tube %d spawned %d px after x=%d at level %d", rec.seq, i, d, base, rec.level)
+  end
+end
+
 local function check_tubes(prev, rec)
+  if rec.mode == MODE.READY then st.slot_level = {} end
   local scored = false
   for i, tb in ipairs(rec.tubes) do
     local pt = prev and prev.tubes[i]
+    if tb.x < 0 then st.slot_level[i] = nil end   -- the old tube is leaving; a missed respawn stays unchecked
     if tb.y ~= 0 then
       if tb.x < 0 then st.left_clip = st.left_clip + 1 end
       if tb.x + TUBE_W > W then st.right_clip = st.right_clip + 1 end
@@ -351,6 +413,8 @@ local function check_tubes(prev, rec)
         end
       elseif tb.x > pt.x then              -- the slot was reused for a new tube on the right
         st.spawned = st.spawned + 1
+        st.slot_level[i] = rec.level
+        check_spawn(rec, i)
         if pt.x > -(TUBE_W - 1) then fail("tube-spawn", "frame %d: tube %d respawned from x=%d, still on screen", rec.seq, i, pt.x) end
         if tb.x < W then fail("tube-spawn", "frame %d: tube %d appeared inside the screen at x=%d", rec.seq, i, tb.x) end
       else
@@ -362,10 +426,24 @@ local function check_tubes(prev, rec)
     local pt = prev and prev.tubes[i]
     if tb.y ~= 0 and pt and pt.y == 0 and tb.x > W / 2 then
       if tb.phase ~= 0 then st.moving = st.moving + 1 end
-      if os.getenv("FB_TRACE") then log("  tube %d enters: y=%d gap=%d phase=%d base=%d (score %d, biome %d)", i, tb.y, tb.gap, tb.phase, tb.base, rec.score, rec.biome) end
-      local known = false
-      for _, g in pairs(BIOME_GAP) do if g == tb.gap then known = true end end
-      if not known then fail("tube-gap", "frame %d: tube %d has gap %d", rec.seq, i, tb.gap) end
+      if os.getenv("FB_TRACE") then log("  tube %d enters: y=%d gap=%d phase=%d base=%d (score %d, level %d)", i, tb.y, tb.gap, tb.phase, tb.base, rec.score, rec.level) end
+      local lv = st.slot_level[i]
+      if lv then                             -- spawned during play: the parameters of its level
+        local s = st.by_level[lv] or { n = 0, moving = 0 }
+        st.by_level[lv] = s
+        s.n = s.n + 1
+        if tb.phase ~= 0 then s.moving = s.moving + 1 end
+        if tb.gap ~= LEVEL_GAP[lv] then
+          fail("tube-gap", "frame %d: tube %d spawned at level %d has gap %d, expected %d", rec.seq, i, lv, tb.gap, LEVEL_GAP[lv])
+        elseif tb.phase == 0 and not static_y_ok(lv, tb.gap, tb.y) then
+          fail("tube-y", "frame %d: static tube %d spawned at level %d has y=%d, not from its table", rec.seq, i, lv, tb.y)
+        end
+        if lv == 0 and tb.phase ~= 0 then fail("tube-move", "frame %d: moving tube %d spawned at level 0", rec.seq, i) end
+      else                                   -- InitialTubes
+        local known = false
+        for _, g in pairs(LEVEL_GAP) do if g == tb.gap then known = true end end
+        if not known then fail("tube-gap", "frame %d: tube %d has gap %d", rec.seq, i, tb.gap) end
+      end
     end
   end
   return scored
@@ -386,10 +464,10 @@ local function check_frame(prev, rec, level)
     end
   end
   if rec.bird_y > 208 then fail("bird", "frame %d: bird y=%d below the ground", rec.seq, rec.bird_y) end
-  if rec.biome ~= expected_biome(rec.score) then
-    fail("biome", "frame %d: biome %d at score %d, expected %d", rec.seq, rec.biome, rec.score, expected_biome(rec.score))
-  elseif rec.gap ~= BIOME_GAP[rec.biome] then
-    fail("biome", "frame %d: tube gap %d in biome %d, expected %d", rec.seq, rec.gap, rec.biome, BIOME_GAP[rec.biome])
+  if rec.level ~= expected_level(rec.score) then
+    fail("level", "frame %d: level %d at score %d, expected %d", rec.seq, rec.level, rec.score, expected_level(rec.score))
+  elseif rec.gap ~= LEVEL_GAP[rec.level] then
+    fail("level", "frame %d: tube gap %d at level %d, expected %d", rec.seq, rec.gap, rec.level, LEVEL_GAP[rec.level])
   end
 end
 
@@ -476,6 +554,28 @@ local function autopilot(rec)
   else space(false) end
 end
 
+-- Get Ready banner and countdown digit (CacheDrawGetReadyTitle, CacheDrawReadyCountdown): not in
+-- the reference picture. A page redrawn after a pause in the countdown must show them as before.
+local READY_BOX = { 112, 112, 207, 163 }
+local function read_box(page, box)
+  local t = {}
+  for y = box[2], box[4] do
+    for x = box[1], box[3] do t[#t + 1] = vram:read_u8(y * 1024 + page * W + x) end
+  end
+  return t
+end
+local function check_ready_banner(rec)
+  st.ready_redraws = (st.ready_redraws or 0) + 1
+  local was = st.ready_banner and st.ready_banner[rec.page]
+  if not was then return end
+  local now_box, bad = read_box(rec.page, READY_BOX), 0
+  for i, v in ipairs(was) do if now_box[i] ~= v then bad = bad + 1 end end
+  if bad > 0 then
+    fail("pause", "frame %d: Get Ready banner redrawn after the pause differs in %d px", rec.seq, bad)
+    shot(string.format("ready-banner-%05d", rec.seq))
+  end
+end
+
 local prev                                -- the last frame seen
 local function tick(pilot)
   local rg = cpu.state["RGMOD"].value & 1
@@ -486,9 +586,14 @@ local function tick(pilot)
     st.shown = st.shown + 1
     check_frame(prev, rec, level)
     check_transition(prev, rec, level)
+    if rec.mode == MODE.PLAY and rec.medal_y ~= 255 and not st.medal_seen[rec.medal_id] then
+      st.medal_seen[rec.medal_id] = rec.score
+    end
+    local ready_redraw = rec.mode == MODE.REDRAW and rec.ready > 0
+    if ready_redraw then check_ready_banner(rec) end
     if rec.mode == MODE.PLAY or rec.mode == MODE.REDRAW then
       st.compared = st.compared + 1
-      local bad, desc = compare(rec, string.format("mismatch-%05d", rec.seq))
+      local bad, desc = compare(rec, string.format("mismatch-%05d", rec.seq), ready_redraw and { mask = READY_BOX } or nil)
       if bad > 0 then
         st.bad_frames = st.bad_frames + 1
         fail("picture", "frame %d (score %d, theme %d): %s; tubes %s; bird y=%d", rec.seq, rec.score, rec.theme, desc, tube_str(rec), rec.bird_y)
@@ -510,28 +615,80 @@ local function scenario()
   for i = 0, 3 do fast:write_u8(S("DbgMagic") + i, 0) end
   type_line(EXE_CMD)
 
+  -- boot, followed by the palette in VRAM: the Sprinter logo fades in, stays at full brightness
+  -- for at least 3 s (the title is loaded meanwhile), fades out to black; then the title fades in
+  -- and, once the rest is loaded, waits for Fire (DbgTitleReady).
+  local prog, ready_at = cpu.spaces["program"], S("DbgTitleReady")
+  local boot = { state = "pre", fade_in = 0, logo = 0, fade_out = 0, title_in = 0 }
+  local t0 = now()
+  while now() - t0 < 120 and not (boot.state == "title" and prog:read_u8(ready_at) == 1) do
+    frames(1)
+    if boot.state == "pre" then
+      if not st.console_shot and now() - t0 > 8 then st.console_shot = true; shot("console") end   -- the banner, while the logo loads
+      if palette_is(logo_pal) then boot.state, boot.logo = "logo", 1; shot("logo")
+      elseif palette_is(nil, #logo_pal) then boot.fade_in = 0
+      else boot.fade_in = boot.fade_in + 1 end
+    elseif boot.state == "logo" then
+      if palette_is(logo_pal) then boot.logo = boot.logo + 1 else boot.state, boot.fade_out = "out", 1 end
+    elseif boot.state == "out" then
+      if palette_is(nil, #title_pal) then boot.state = "dark" else boot.fade_out = boot.fade_out + 1 end
+    elseif boot.state == "dark" then
+      if palette_is(title_pal) then boot.state = "title"
+      elseif not palette_is(nil, #title_pal) then boot.title_in = boot.title_in + 1 end
+    end
+  end
+  log("boot %.1f s: logo fade in %d frames, at full brightness %d frames (%.1f s), fade out %d frames; title fade in %d frames",
+      now() - t0, boot.fade_in, boot.logo, boot.logo / 50, boot.fade_out, boot.title_in)
+  if boot.state ~= "title" then fail("boot", "the title did not come in %d s (stopped at %s)", 120, boot.state); shot("no-title"); return end
+  if boot.logo < 150 then fail("boot", "the logo stayed %d frames at full brightness, expected at least 150 (3 s)", boot.logo) end
+  for _, f in ipairs({ { "logo fade in", boot.fade_in }, { "logo fade out", boot.fade_out }, { "title fade in", boot.title_in } }) do
+    if f[2] < 8 then fail("boot", "%s took %d frames: no fade", f[1], f[2]) end
+  end
+  shot("title")
+
   -- title: tap Space on the PC/AT (PS/2) keyboard until the render cache (and the debug block
   -- in it) is installed. The PS/2 path (SIO byte -> IRQ vector #FF -> KeysHandler -> KeyPressed)
   -- is the only keyboard when MAME has only "kbd:ms_naturl" enabled; the ZX matrix is used in play.
   local kbd_space = assert(fields["Space"], "no PC keyboard Space field")
-  local t0, started = now(), false
-  while now() - t0 < 120 do
+  local started = false
+  t0 = now()
+  while now() - t0 < 30 do
+    kbd_space:set_value(1); frames(5); kbd_space:set_value(0)
     frames(40)
     if magic_at(0) then started = true; break end
-    if now() - t0 > 4 then
-      if not st.title_shot then st.title_shot = true; shot("title") end
-      kbd_space:set_value(1); frames(5); kbd_space:set_value(0)
-    end
   end
   if not started then
     for off = 0, 0xC000, 0x4000 do if magic_at(off) then fast_off = off; started = true end end
   end
-  if not started then fail("start", "the game did not start in %d s", 120); shot("no-start"); return end
-  log("game started %.1f s after the command (cache at +%X)", now() - t0, fast_off)
+  if not started then fail("start", "the game did not start in %d s after Fire on the title", 30); shot("no-start"); return end
+  log("game started %.1f s after Fire on the title (cache at +%X)", now() - t0, fast_off)
 
-  -- Get Ready countdown
+  -- Get Ready countdown, paused in the middle (digit 2 on both pages): the countdown stops with
+  -- the message shown, and after Fire both pages are redrawn with the banner and it goes on.
   local rec
   t0 = now()
+  repeat frames(1); rec = tick(false) until (rec.mode == MODE.READY and rec.ready <= 100) or now() - t0 > 20
+  if rec.mode ~= MODE.READY then fail("start", "no Get Ready countdown 20 s after the start (mode %d)", rec.mode); return end
+  st.ready_banner = { [0] = read_box(0, READY_BOX), [1] = read_box(1, READY_BOX) }
+  esc()
+  frames(40)
+  local paused = read_rec(cpu.state["RGMOD"].value & 1)
+  shot("pause-ready")
+  frames(10)
+  rec = read_rec(cpu.state["RGMOD"].value & 1)
+  if paused.mode ~= MODE.READY or rec.seq ~= paused.seq or rec.ready ~= paused.ready then
+    fail("pause", "Esc in the countdown did not pause it (mode %d, frame %d -> %d, counter %d -> %d)",
+         paused.mode, paused.seq, rec.seq, paused.ready, rec.ready)
+  end
+  space(true)
+  repeat frames(1); rec = tick(false) until (rec.mode == MODE.READY and rec.seq ~= paused.seq) or now() - t0 > 20
+  space(false)
+  if (st.ready_redraws or 0) ~= 2 then fail("pause", "%d pages redrawn after the pause in the countdown, expected 2", st.ready_redraws or 0) end
+  if rec.ready ~= paused.ready - 1 then
+    fail("pause", "the countdown went on from %d after the pause, expected %d", rec.ready, paused.ready - 1)
+  end
+  log("pause in the countdown at %d: %d pages redrawn, the countdown went on from %d", paused.ready, st.ready_redraws or 0, rec.ready)
+  st.ready_banner = nil
   repeat frames(1); rec = tick(false) until rec.mode == MODE.PLAY or now() - t0 > 20
   if rec.mode ~= MODE.PLAY then fail("start", "no play frame 20 s after the start (mode %d)", rec.mode); return end
   log("play started at frame %d", rec.seq)
@@ -545,7 +702,7 @@ local function scenario()
     rec = tick(true)
     if rec.score ~= last_score then
       last_score, t_score = rec.score, now()
-      if rec.score == 30 then shot("play-night") end
+      if rec.score == 50 then shot("play-night") end
     end
     if now() - t_score > 30 then fail("stall", "score stuck at %d for 30 s (frame %d)", rec.score, rec.seq); break end
   end
@@ -647,11 +804,25 @@ local function scenario()
       st.left_clip, st.right_clip, st.max_fall)
   log("autopilot: %d frames inside a tube (immortal bird, hit counter %d)", st.overlap, rec.hits)
   local want = {}
-  for _, s in ipairs({ 25, 50, 80 }) do if s <= TARGET_SCORE then want[#want + 1] = s end end
+  for s = 50, TARGET_SCORE, 50 do want[#want + 1] = s end
   local got = {}
   for _, s in ipairs(st.switches) do got[#got + 1] = s.score end
   if table.concat(got, ",") ~= table.concat(want, ",") then
     fail("theme", "theme switches at scores [%s], expected [%s]", table.concat(got, ","), table.concat(want, ","))
+  end
+  local parts = {}
+  for lv = 0, #LEVEL_GAP do
+    local s = st.by_level[lv]
+    if s then parts[#parts + 1] = string.format("L%d %d/%d", lv, s.moving, s.n) end
+  end
+  log("moving tubes by spawn level (moving/all): %s", table.concat(parts, " "))
+  for id, s in pairs(MEDAL_SCORE) do      -- every medal reached appears exactly at its score
+    if s <= TARGET_SCORE and st.medal_seen[id] ~= s then
+      fail("medal", "medal %d first seen at score %s, expected %d", id, tostring(st.medal_seen[id]), s)
+    end
+  end
+  for id, s in pairs(st.medal_seen) do    -- and none early or unknown (#ff: no medal yet)
+    if id ~= 255 and MEDAL_SCORE[id] ~= s then fail("medal", "medal %d appeared at score %d", id, s) end
   end
   if st.compared < 100 then fail("coverage", "only %d frames compared", st.compared) end
   if TARGET_SCORE >= 40 and st.moving == 0 then fail("coverage", "no moving tube in %d tubes", st.spawned) end

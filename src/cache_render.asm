@@ -205,10 +205,12 @@ CacheRestartGame:
                 ld a,150
                 ld (ReadyCounter),a
                 xor a
-                ld (CurrentBiome),a
-                ld a,156
-                ld (CurrentTubeInterval),a
-                ld a,80
+                ld (CurrentLevel),a
+                ld (ScoreInTheme),a
+                ld (ThemeParity),a
+                ld hl,LevelParams
+                ld (CurrentLevelParams),hl
+                ld a,(LevelParams)
                 ld (CurrentTubeGap),a
                 ld (CacheDrawTubeGap),a
                 ld a,r
@@ -820,7 +822,8 @@ CacheAddScore:
                 call CacheMarkHudDirty
                 call CacheCheckMedalAward
                 call CacheUpdateHighScore
-                call CacheUpdateBiomeParams
+                call CacheAdvanceThemeParity
+                call CacheUpdateLevel
                 pop hl
                 pop af
                 ret
@@ -830,13 +833,13 @@ CacheCheckMedalAward:
                 and a
                 ret nz
                 ld a,l
-                cp 10
-                jr z,.bronze
                 cp 25
-                jr z,.silver
+                jr z,.bronze
                 cp 50
-                jr z,.gold
+                jr z,.silver
                 cp 100
+                jr z,.gold
+                cp 200
                 ret nz
 .platinum:      ld a,3
                 jr CacheStartFieldMedalAward
@@ -873,68 +876,69 @@ CacheUpdateHighScore:
                 pop af
                 ret
 
-CacheUpdateBiomeParams:
+; Level = number of LevelScores entries <= Score (0..LEVEL_MAX); a score above 255 is past
+; all of them. Then point CurrentLevelParams at the level's row and take its gap.
+CacheUpdateLevel:
                 push af
+                push bc
+                push de
                 push hl
                 ld hl,(Score)
                 ld a,h
                 and a
-                jr nz,.villageNight
+                ld c,LEVEL_MAX
+                jr nz,.gotLevel
                 ld a,l
-                cp 10
-                jr c,.cityDay
-                cp 25
-                jr c,.cityEvening
-                cp 50
-                jr c,.cityNight
-                cp 80
-                jr c,.villageDay
-.villageNight:  ld a,BIOME_VILLAGE_NIGHT
-                ld (CurrentBiome),a
-                ld a,104
-                ld (CurrentTubeInterval),a
-                ld a,64
-                jr .setGap
-.villageDay:    ld a,BIOME_VILLAGE_DAY
-                ld (CurrentBiome),a
-                ld a,116
-                ld (CurrentTubeInterval),a
-                ld a,68
-                jr .setGap
-.cityNight:     ld a,BIOME_CITY_NIGHT
-                ld (CurrentBiome),a
-                ld a,132
-                ld (CurrentTubeInterval),a
-                ld a,72
-                jr .setGap
-.cityEvening:   ld a,BIOME_CITY_EVENING
-                ld (CurrentBiome),a
-                ld a,148
-                ld (CurrentTubeInterval),a
-                ld a,76
-                jr .setGap
-.cityDay:       ld a,BIOME_CITY_DAY
-                ld (CurrentBiome),a
-                ld a,156
-                ld (CurrentTubeInterval),a
-                ld a,80
-.setGap:        ld (CurrentTubeGap),a
-                call CacheRequestBiomeTheme
+                ld hl,LevelScores
+                ld b,LEVEL_MAX
+                ld c,0
+.loop:          cp (hl)
+                jr c,.gotLevel
+                inc c
+                inc hl
+                djnz .loop
+.gotLevel:      ld a,c
+                ld (CurrentLevel),a
+                ld l,a
+                ld h,0
+                add hl,hl
+                add hl,hl
+                add hl,hl               ; *LEVEL_PARAMS_SIZE (8)
+                ld de,LevelParams
+                add hl,de
+                ld (CurrentLevelParams),hl
+                ld a,(hl)
+                ld (CurrentTubeGap),a
+                call CacheRequestTheme
                 pop hl
+                pop de
+                pop bc
                 pop af
                 ret
 
-; Request a faded day/night switch when the biome theme changes.
-CacheRequestBiomeTheme:
-                ld a,(CurrentBiome)
-                cp BIOME_CITY_NIGHT
-                jr z,.night
-                cp BIOME_VILLAGE_NIGHT
-                jr z,.night
-                ld a,THEME_DAY
-                jr .check
-.night:         ld a,THEME_NIGHT
-.check:         ld hl,CurrentTheme
+; Count points within the current theme; every 50th toggles ThemeParity (the fade itself is
+; requested by CacheRequestTheme, called from CacheUpdateLevel right after).
+CacheAdvanceThemeParity:
+                push af
+                ld hl,ScoreInTheme
+                ld a,(hl)
+                inc a
+                cp 50
+                jr c,.store
+                xor a
+                push af
+                ld a,(ThemeParity)
+                xor 1
+                ld (ThemeParity),a
+                pop af
+.store:         ld (hl),a
+                pop af
+                ret
+
+; Request a faded day/night switch when the desired theme (ThemeParity) changes.
+CacheRequestTheme:
+                ld a,(ThemeParity)
+                ld hl,CurrentTheme
                 cp (hl)
                 ret z
                 ld (PendingTheme),a
@@ -991,6 +995,11 @@ CacheRedrawFrame:
                 call CacheDrawTubes
                 call CacheDrawBird
                 call CacheDrawScore
+                ld a,(ReadyCounter)     ; paused during Get Ready: the banner is under the message
+                and a
+                jp z,CacheFinishFrame
+                call CacheDrawGetReadyTitle
+                call CacheDrawReadyCountdown
                 jp CacheFinishFrame
 
 CacheSpawnTube:
@@ -1112,28 +1121,15 @@ CacheClampMovingTubeBaseY:
                 pop bc
                 ret
 
+; CurrentLevelParams+1 is the moving-tube threshold, 0..127 (CacheRandom's range); 0 means
+; no moving tubes at all (cp 0 never sets carry).
 CacheShouldSpawnMovingTube:
                 call CacheRandom
                 ld b,a
-                ld a,(CurrentBiome)
-                cp BIOME_CITY_EVENING
-                jr z,.cityEvening
-                cp BIOME_CITY_NIGHT
-                jr z,.cityNight
-                cp BIOME_VILLAGE_DAY
-                jr z,.villageDay
-                cp BIOME_VILLAGE_NIGHT
-                jr z,.villageNight
-                ld a,26                 ; about 1/10
-                jr .check
-.cityEvening:   ld a,32                 ; 1/8
-                jr .check
-.cityNight:     ld a,43                 ; about 1/6
-                jr .check
-.villageDay:    ld a,64                 ; 1/4
-                jr .check
-.villageNight:  ld a,128                ; 1/2
-.check:         ld c,a
+                ld hl,(CurrentLevelParams)
+                inc hl
+                ld a,(hl)
+                ld c,a
                 ld a,b
                 cp c                    ; carry set when random < threshold
                 ret
@@ -1198,30 +1194,18 @@ CacheGetSpawnDistance:
                 pop af
                 ret
 
+; Keeps BC: CacheGetSpawnDistance holds its extra distance in B across the call.
 CacheGetIntervalJitter:
                 call CacheRandom
                 and 3
                 ld e,a
                 ld d,0
-                ld a,(CurrentBiome)
-                cp BIOME_CITY_EVENING
-                jr z,.cityEvening
-                cp BIOME_CITY_NIGHT
-                jr z,.cityNight
-                cp BIOME_VILLAGE_DAY
-                jr z,.villageDay
-                cp BIOME_VILLAGE_NIGHT
-                jr z,.villageNight
-                ld hl,TubeIntervalCityDay
-                jr .pick
-.cityEvening:   ld hl,TubeIntervalCityEvening
-                jr .pick
-.cityNight:     ld hl,TubeIntervalCityNight
-                jr .pick
-.villageDay:    ld hl,TubeIntervalVillageDay
-                jr .pick
-.villageNight:  ld hl,TubeIntervalVillageNight
-.pick:          add hl,de
+                push bc
+                ld hl,(CurrentLevelParams)
+                ld bc,2                 ; -> the 4 interval bytes
+                add hl,bc
+                pop bc
+                add hl,de
                 ld a,(hl)
                 ret
 
@@ -1238,13 +1222,14 @@ CacheSelectTubeY:
                 jr nc,.absReady
                 neg
 .absReady:      cp 40
-                jr nc,.useSelected
-                call CacheRandom
+                ld a,c
+                jr nc,.useSelected      ; far enough from the previous tube
+                call CacheRandom        ; too close: take one from the other half of the set
                 and 3
                 add a,a
                 ld c,a
                 ld a,b
-                cp 84
+                cp TUBE_Y_SPLIT
                 ld a,c
                 jr nc,.setFallbackIndex
                 inc a
@@ -1254,29 +1239,21 @@ CacheSelectTubeY:
 .useSelected:   pop bc
                 ret
 
+; Keeps BC: CacheSelectTubeY holds the rightmost tube's Y in B across the call.
 CacheSelectTubeYByIndex:
                 ld a,(TubeYIndex)
                 ld e,a
                 ld d,0
-                ld a,(CurrentBiome)
-                cp BIOME_CITY_EVENING
-                jr z,.cityEvening
-                cp BIOME_CITY_NIGHT
-                jr z,.cityNight
-                cp BIOME_VILLAGE_DAY
-                jr z,.villageDay
-                cp BIOME_VILLAGE_NIGHT
-                jr z,.villageNight
-                ld hl,TubeYCityDay
-                jr .pick
-.cityEvening:   ld hl,TubeYCityEvening
-                jr .pick
-.cityNight:     ld hl,TubeYCityNight
-                jr .pick
-.villageDay:    ld hl,TubeYVillageDay
-                jr .pick
-.villageNight:  ld hl,TubeYVillageNight
-.pick:          add hl,de
+                push bc
+                ld hl,(CurrentLevelParams)
+                ld bc,6                 ; -> dw tube-Y table pointer
+                add hl,bc
+                pop bc
+                ld a,(hl)
+                inc hl
+                ld h,(hl)
+                ld l,a
+                add hl,de
                 ld a,(hl)
                 ret
 
@@ -2303,13 +2280,13 @@ CacheSelectMedal:
                 and a
                 jr nz,.platinum
                 ld a,l
-                cp 100
+                cp 200
                 jr nc,.platinum
-                cp 50
+                cp 100
                 jr nc,.gold
-                cp 25
+                cp 50
                 jr nc,.silver
-                cp 10
+                cp 25
                 jr nc,.bronze
                 ld a,#ff
                 ret
@@ -2652,7 +2629,7 @@ DBG_SCORE       equ 8                   ; dw
 DBG_HIGH_SCORE  equ 10                  ; dw
 DBG_MEDAL_ID    equ 12
 DBG_MEDAL_Y     equ 13                  ; #ff - not drawn on this page
-DBG_BIOME       equ 14
+DBG_LEVEL       equ 14
 DBG_GAP         equ 15
 DBG_HITS        equ 16                  ; dw
 DBG_READY       equ 18
@@ -2688,8 +2665,8 @@ CacheDbgRecord:
                 ld (DbgLive+DBG_HIGH_SCORE),hl
                 ld a,(FieldMedalId)
                 ld (DbgLive+DBG_MEDAL_ID),a
-                ld a,(CurrentBiome)
-                ld (DbgLive+DBG_BIOME),a
+                ld a,(CurrentLevel)
+                ld (DbgLive+DBG_LEVEL),a
                 ld a,(CurrentTubeGap)
                 ld (DbgLive+DBG_GAP),a
                 ld hl,(DbgHits)
