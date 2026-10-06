@@ -1675,6 +1675,9 @@ GameOverWaitRelease:
                 db 0
 GameOverRestartDelay:
                 db 0
+GameOverStage:  db 0                    ; CacheRenderGameOver: settled scene frames, then panel, then static
+GAME_OVER_PANEL equ 2
+GAME_OVER_STATIC equ 4
 ReadyCounter:   db 150
 ReadyCleanupCounter:
                 db 0

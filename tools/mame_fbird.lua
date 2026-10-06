@@ -100,7 +100,7 @@ local SPR = {                            -- offsets in tubes.bin
 }
 local SKY = { [0] = S("DAY_SKY_COLOR"), [1] = S("NIGHT_SKY_COLOR") }
 local GRASS = { [0] = S("DAY_GRASS_COLOR"), [1] = S("NIGHT_GRASS_COLOR") }
-local MODE = { PLAY = S("DBG_MODE_PLAY"), READY = S("DBG_MODE_READY"), GAMEOVER = S("DBG_MODE_GAMEOVER"), REDRAW = S("DBG_MODE_REDRAW") }
+local MODE = { PLAY = S("DBG_MODE_PLAY"), READY = S("DBG_MODE_READY"), GAMEOVER = S("DBG_MODE_GAMEOVER"), REDRAW = S("DBG_MODE_REDRAW"), PANEL = S("DBG_MODE_PANEL") }
 local TUBES, TUBE_SIZE = S("TUBES_COUNT"), S("TUBE_ENTRY_SIZE")
 
 -- requirements checked (specs.md 7, 8): the visual theme and the tube parameters by score.
@@ -554,9 +554,67 @@ local function autopilot(rec)
   else space(false) end
 end
 
+-- Frame budget. The main loop shows the render time in the border: out (#fe),2 before
+-- RunRenderCache and 0 after it (src/fbird.asm). Measured from these port writes in emulated time,
+-- i.e. by MAME's model of the Sprinter (CPU, memory and accelerator wait states), and attributed
+-- to the state that was just rendered (DbgLive).
+local FRAME_S, LINE_S = screen.frame_period, screen.scan_period
+local VTOTAL = math.floor(FRAME_S / LINE_S + 0.5)                  -- lines in a frame, borders included
+local function beam_line()                                        -- lines since the start of the vblank (frame interrupt)
+  return (FRAME_S - screen:time_until_vblank_start():as_double()) / LINE_S
+end
+local MODE_NAME = { [MODE.PLAY] = "play", [MODE.READY] = "ready", [MODE.GAMEOVER] = "game over", [MODE.REDRAW] = "redraw", [MODE.PANEL] = "game over panel" }
+local budget = { n = 0, sum = 0, max = 0, over = 0, wrap = 0, by_mode = {}, by_level = {}, slowest = {} }
+local function measure_border(offset, data)
+  if offset & 0xff ~= 0xfe then return end
+  local t = machine.time:as_double()
+  if data & 7 == 2 then budget.t0, budget.v0 = t, beam_line(); return end
+  if not budget.t0 then return end
+  local d, v0 = t - budget.t0, budget.v0
+  budget.t0 = nil
+  local live = S("DbgLive")
+  local r = { d = d, v0 = v0, v1 = v0 + d / LINE_S, mode = fu8(live + S("DBG_MODE")),
+              score = fu16(live + S("DBG_SCORE")), level = fu8(live + S("DBG_LEVEL")) }
+  budget.n, budget.sum = budget.n + 1, budget.sum + d
+  if d > budget.max then budget.max = d end
+  if d > FRAME_S then budget.over = budget.over + 1 end
+  if r.v1 >= VTOTAL then budget.wrap = budget.wrap + 1 end
+  budget.by_mode[r.mode] = math.max(budget.by_mode[r.mode] or 0, d)
+  if r.mode == MODE.PLAY then budget.by_level[r.level] = math.max(budget.by_level[r.level] or 0, d) end
+  table.insert(budget.slowest, r)
+  table.sort(budget.slowest, function(a, b) return a.d > b.d end)
+  budget.slowest[6] = nil
+end
+local function on_border(offset, data)         -- MAME drops errors in a tap silently: keep the first one
+  local ok, err = pcall(measure_border, offset, data)
+  if not ok and not budget.err then budget.err = tostring(err) end
+end
+local function report_budget()
+  local pct = function(d) return 100 * d / FRAME_S end
+  log("frame budget (MAME timing): %d renders, mean %.1f%%, max %.1f%% of a frame (%.2f of %.2f ms, %d of %d lines)",
+      budget.n, pct(budget.sum / math.max(budget.n, 1)), pct(budget.max), budget.max * 1000, FRAME_S * 1000,
+      math.floor(budget.max / LINE_S + 0.5), VTOTAL)
+  local m, l = {}, {}
+  for mode, d in pairs(budget.by_mode) do m[#m + 1] = string.format("%s %.1f%%", MODE_NAME[mode] or mode, pct(d)) end
+  for lv = 0, #LEVEL_GAP do if budget.by_level[lv] then l[#l + 1] = string.format("L%d %.1f%%", lv, pct(budget.by_level[lv])) end end
+  log("  max by mode: %s; in play by level: %s", table.concat(m, ", "), table.concat(l, " "))
+  for _, r in ipairs(budget.slowest) do
+    log("  slow: %.1f%% (%s, score %d, level %d), border on lines %d..%d", pct(r.d), MODE_NAME[r.mode] or r.mode, r.score, r.level,
+        math.floor(r.v0), math.floor(r.v1))
+  end
+  if budget.err then fail("budget", "measurement error: %s", budget.err) end
+  if budget.n == 0 then fail("budget", "no render time measured (no out (#fe) writes seen)") end
+  if budget.over > 0 or budget.wrap > 0 then
+    fail("budget", "%d renders longer than a frame, %d with the border past the last line of the frame", budget.over, budget.wrap)
+  end
+end
+
 -- Get Ready banner and countdown digit (CacheDrawGetReadyTitle, CacheDrawReadyCountdown): not in
 -- the reference picture. A page redrawn after a pause in the countdown must show them as before.
 local READY_BOX = { 112, 112, 207, 163 }
+-- Game over title and panel (CacheDrawGameOverTitle, CacheDrawGameOverPanelFrame): not in the
+-- reference either; the rest of a panel frame is the final scene.
+local GAME_OVER_BOX = { 104, 80, 216, 168 }
 local function read_box(page, box)
   local t = {}
   for y = box[2], box[4] do
@@ -591,9 +649,10 @@ local function tick(pilot)
     end
     local ready_redraw = rec.mode == MODE.REDRAW and rec.ready > 0
     if ready_redraw then check_ready_banner(rec) end
-    if rec.mode == MODE.PLAY or rec.mode == MODE.REDRAW then
+    local mask = ready_redraw and READY_BOX or rec.mode == MODE.PANEL and GAME_OVER_BOX or nil
+    if rec.mode == MODE.PLAY or rec.mode == MODE.REDRAW or rec.mode == MODE.GAMEOVER or rec.mode == MODE.PANEL then
       st.compared = st.compared + 1
-      local bad, desc = compare(rec, string.format("mismatch-%05d", rec.seq), ready_redraw and { mask = READY_BOX } or nil)
+      local bad, desc = compare(rec, string.format("mismatch-%05d", rec.seq), mask and { mask = mask } or nil)
       if bad > 0 then
         st.bad_frames = st.bad_frames + 1
         fail("picture", "frame %d (score %d, theme %d): %s; tubes %s; bird y=%d", rec.seq, rec.score, rec.theme, desc, tube_str(rec), rec.bird_y)
@@ -662,6 +721,7 @@ local function scenario()
   end
   if not started then fail("start", "the game did not start in %d s after Fire on the title", 30); shot("no-start"); return end
   log("game started %.1f s after Fire on the title (cache at +%X)", now() - t0, fast_off)
+  st.border_tap = cpu.spaces["io"]:install_write_tap(0x0000, 0xffff, "fbird-border", on_border)   -- kept: a dropped tap is removed
 
   -- Get Ready countdown, paused in the middle (digit 2 on both pages): the countdown stops with
   -- the message shown, and after Fire both pages are redrawn with the banner and it goes on.
@@ -763,16 +823,42 @@ local function scenario()
   if rec.seq - resumed < 50 then fail("pause", "only %d frames in 100 after continue", rec.seq - resumed) end
   log("pause/continue at score %d (theme %d, %d tubes under the message): %d frames after continue", rec.score, rec.theme, under, rec.seq - resumed)
 
-  -- Death and restart in the night theme: the new game starts in the day theme with a whole picture
+  -- Death and restart. The mortal bird is kept at the ceiling until it hits a tube and falls.
+  -- While it falls the game over frames hold the scene only (compared whole); once it lies on the
+  -- ground the title and the panel are drawn once on each page and the rendering stops. The new
+  -- game starts in the day theme with a whole picture.
   local died_theme = rec.theme
   fast:write_u8(S("DbgMortal") + fast_off, 1)
-  space(false)
   t0 = now()
-  repeat frames(1); rec = tick(false) until rec.mode == MODE.GAMEOVER or now() - t0 > 20
+  local n = 0
+  repeat
+    frames(1); rec = tick(false); n = n + 1
+    space(n % 8 < 2)                         -- a flap every 8 frames: up to the ceiling and into a tube
+  until rec.mode == MODE.GAMEOVER or now() - t0 > 20
+  space(false)
   if rec.mode ~= MODE.GAMEOVER then
     fail("restart", "the mortal bird did not die in 20 s (mode %d)", rec.mode)
   else
-    frames(120)                              -- the fall and the restart delay
+    local go, last = { y0 = rec.bird_y, scene = 1, panel = 0 }, rec.seq
+    for _ = 1, 150 do                        -- the fall, the panel and the restart delay
+      frames(1); rec = tick(false)
+      if rec.seq ~= last then
+        last = rec.seq
+        if rec.mode == MODE.PANEL then
+          go.panel = go.panel + 1
+          if rec.bird_y < 208 then fail("game-over", "frame %d: the panel is drawn with the bird at y=%d, in the air", rec.seq, rec.bird_y) end
+        elseif rec.mode == MODE.GAMEOVER then
+          go.scene = go.scene + 1
+          if go.panel > 0 then fail("game-over", "frame %d: the scene is drawn again after the panel", rec.seq) end
+        end
+      end
+    end
+    frames(30)
+    local still = read_rec(cpu.state["RGMOD"].value & 1)
+    if still.seq ~= last then fail("game-over", "the game over screen is still drawn (frame %d -> %d)", last, still.seq) end
+    if go.panel ~= 2 then fail("game-over", "the panel was drawn %d times, expected once per page (2)", go.panel) end
+    if go.scene < (208 - go.y0) // 4 then fail("game-over", "%d scene frames for a fall from y=%d", go.scene, go.y0) end
+    log("game over: fell from y=%d in %d scene frames, the panel drawn on %d pages, then nothing drawn", go.y0, go.scene, go.panel)
     shot("game-over")
     space(true); frames(5); space(false)
     t0 = now()
@@ -803,6 +889,7 @@ local function scenario()
   log("tubes spawned %d (moving %d), frames with a tube clipped left %d / right %d, max fall %d px/frame", st.spawned, st.moving,
       st.left_clip, st.right_clip, st.max_fall)
   log("autopilot: %d frames inside a tube (immortal bird, hit counter %d)", st.overlap, rec.hits)
+  report_budget()
   local want = {}
   for s = 50, TARGET_SCORE, 50 do want[#want + 1] = s end
   local got = {}

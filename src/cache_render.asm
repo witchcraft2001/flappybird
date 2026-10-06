@@ -60,7 +60,10 @@ CacheRenderGameOver:
                 ld a,DBG_MODE_GAMEOVER
                 ld (DbgLive+DBG_MODE),a
                 ENDIF
-                call CacheRestoreBirdBackground
+                ld a,(GameOverStage)
+                cp GAME_OVER_PANEL
+                jr nc,.panel
+                call CacheRestoreBirdBackground         ; the bird falls: the scene only
                 call CacheRestoreFieldMedalBackground
                 call CacheDrawCity
                 call CacheDrawWay
@@ -69,7 +72,17 @@ CacheRenderGameOver:
                 call CacheDrawTubes
                 call CacheDrawBird
                 call CacheDrawScore
-                call CacheDrawGameOverTitle
+                call CacheGameOverSettle
+                jr CacheFinishFrame
+.panel:         cp GAME_OVER_STATIC
+                ret nc                  ; both pages show the panel: nothing to redraw, no flip
+                inc a
+                ld (GameOverStage),a
+                IFDEF AUTOTEST
+                ld a,DBG_MODE_PANEL
+                ld (DbgLive+DBG_MODE),a
+                ENDIF
+                call CacheDrawGameOverTitle             ; over the final scene, once per page
                 call CacheDrawGameOverPanel
 CacheFinishFrame:
                 IFDEF AUTOTEST
@@ -147,6 +160,25 @@ CacheGameOverFall:
 .store:         ld (BirdY),a
                 ret
 
+; Counts consecutive frames that drew the final scene (the bird on the ground, the field medal
+; and the HUD settled on both pages); two of them put it on both video pages.
+CacheGameOverSettle:
+                ld a,(BirdY)
+                cp 208
+                jr c,.moving
+                ld a,(FieldMedalAnim)
+                ld hl,CacheHudDirtyFirst
+                or (hl)
+                ld hl,CacheHudDirtySecond
+                or (hl)
+                jr nz,.moving
+                ld hl,GameOverStage
+                inc (hl)
+                ret
+.moving:        xor a
+                ld (GameOverStage),a
+                ret
+
 CacheCheckGameOverRestart:
                 ld a,(GameOverRestartDelay)
                 and a
@@ -182,6 +214,7 @@ CacheRestartGame:
                 ld (GemeOver),a
                 ld (GameOverWaitRelease),a
                 ld (GameOverRestartDelay),a
+                ld (GameOverStage),a
                 ld (Score),a
                 ld (Score+1),a
                 ld (TubeYIndex),a
@@ -254,6 +287,8 @@ CacheSetGameOver:
                 ld (GameOverWaitRelease),a
                 ld a,75
                 ld (GameOverRestartDelay),a
+                xor a
+                ld (GameOverStage),a
                 ret
 
 CacheUpdateReadyCounter:
@@ -2639,6 +2674,7 @@ DBG_MODE_PLAY   equ 0
 DBG_MODE_READY  equ 1
 DBG_MODE_GAMEOVER equ 2
 DBG_MODE_REDRAW equ 3
+DBG_MODE_PANEL  equ 4                   ; game over: the title and the panel drawn over the final scene
 
 CacheDbgRecord:
                 ld hl,(DbgLive+DBG_SEQ)
