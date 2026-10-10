@@ -324,12 +324,10 @@ local function compare(rec, name, opts)
 end
 
 -- ---------------------------------------------------------------- keyboard
-local fields, matrix = {}, {}
+local fields = {}
 for tag, port in pairs(machine.ioport.ports) do
   if tag:find("^:kbd:") then for fname, f in pairs(port.fields) do fields[fname] = f end end
-  if tag:find("^:IO_LINE") then for fname, f in pairs(port.fields) do matrix[fname] = f end end
 end
-local function mkey(name) return assert(matrix[name], "no matrix key " .. name) end
 local shifted = { [":"] = ";", ["_"] = "-", ["+"] = "=" }
 local HOLD = 3
 local function press(ch)
@@ -348,16 +346,18 @@ local function type_line(s)
   for i = 1, #s do press(s:sub(i, i)) end
   press("\n")
 end
+-- The game reads Space/Esc from the PS/2 scan-code stream (KeysHandler -> KeyState/
+-- KeyFrame) now, not the ZX matrix (deprecated in Sprinter mode), so drive the PC
+-- keyboard fields directly instead of the ":IO_LINE*" matrix ports.
+local kbd_esc = assert(fields["Esc"], "no PC keyboard Esc field")
 local space_down = false
 local function space(down)
-  if down ~= space_down then mkey("SPACE"):set_value(down and 1 or 0); space_down = down end
+  if down ~= space_down then fields["Space"]:set_value(down and 1 or 0); space_down = down end
 end
-local function esc()                     -- a PC Esc is CS+Space in the matrix (CheckControlKey)
+local function esc()
   space(false)
-  mkey("CAPS SHIFT"):set_value(1); frames(1)
-  mkey("SPACE"):set_value(1); frames(4)
-  mkey("SPACE"):set_value(0); frames(1)
-  mkey("CAPS SHIFT"):set_value(0)
+  kbd_esc:set_value(1); frames(4)
+  kbd_esc:set_value(0); frames(1)
 end
 
 -- ---------------------------------------------------------------- per-frame checks
@@ -585,9 +585,99 @@ local function measure_border(offset, data)
   table.sort(budget.slowest, function(a, b) return a.d > b.d end)
   budget.slowest[6] = nil
 end
+-- Music ticks (CTC ch3 -> Im2Handler -> Player, ~50 Hz): one burst of AY register
+-- writes (#FFFD) per tick. A tick delayed or doubled by a long DI (CacheClearPlayfieldPages,
+-- a palette fade step, ...) shows as an interval far from one frame.
+local tick_audio = { last = nil, n = 0, bad = {} }
+local function measure_music_tick(t)
+  if tick_audio.last then
+    local q = (t - tick_audio.last) / FRAME_S
+    if q < 0.9 or q > 1.1 then tick_audio.bad[#tick_audio.bad + 1] = { t = t, frames = q } end
+  end
+  tick_audio.last = t
+  tick_audio.n = tick_audio.n + 1
+end
+
+-- CBL/SFX feed (hit/die/point): SfxHandleCblInterrupt gates on #FE bit 7 (CBL_IND) now,
+-- so a run should take close to its real duration -- 128 bytes/block, 16.384 ms/block at
+-- the #98 rate code (CBL_CTRL_RUN_11K_MONO_INT) -- rather than being rushed by VSync or
+-- keyboard interrupts sharing the same vector.
+-- The other way round, a half-empty IRQ missed and not caught up stretches the run: the
+-- first block goes in one block after the start (#98), and the stop (#4E <- idle) comes
+-- one IRQ after the last block, so a paced run lasts (blocks + 1) blocks at most.
+local CBL_BLOCK_S = 128 / 7812.5               -- 16.384 ms, 7.8125 kHz mono 8-bit (rate code 8)
+local cbl_audio = { run = nil, runs = {}, bad = {}, long = {}, paced = 0, min_q = nil, max_q = nil }
+local last_ay = -1
+local function measure_audio(offset, data)
+  local off8 = offset & 0xff
+  if offset == 0xFFFD then
+    local t = machine.time:as_double()
+    if t - last_ay > 0.004 then measure_music_tick(t) end         -- new burst, not another register in the same tick
+    last_ay = t
+  elseif off8 == 0x4e then
+    local t = machine.time:as_double()
+    if cbl_audio.run then
+      local r = cbl_audio.run
+      r.dur, r.end_ctrl = t - r.t0, data
+      cbl_audio.runs[#cbl_audio.runs + 1] = r
+      -- A run fed by the real half-empty IRQ spans more than one 128-byte block with a
+      -- gap between them (~16.384 ms each, one per IRQ); a one-shot flush (SfxInit's
+      -- SfxFlushCblBuffer, SfxAbortCblPlayback's SfxHardQuenchCbl) writes every byte back
+      -- to back with no pacing at all, so only runs that show at least one such gap are
+      -- real playback and worth timing.
+      if r.gaps > 0 then
+        local blocks = r.bytes / 128
+        local q = r.dur / (blocks * CBL_BLOCK_S)
+        cbl_audio.paced = cbl_audio.paced + 1
+        cbl_audio.min_q = math.min(cbl_audio.min_q or q, q)
+        cbl_audio.max_q = math.max(cbl_audio.max_q or q, q)
+        if r.dur < blocks * CBL_BLOCK_S * 0.9 then cbl_audio.bad[#cbl_audio.bad + 1] = r end
+        if r.dur > (blocks + 1) * CBL_BLOCK_S * 1.1 then cbl_audio.long[#cbl_audio.long + 1] = r end
+      end
+      cbl_audio.run = nil
+    end
+    if data == 0x98 then cbl_audio.run = { t0 = t, bytes = 0, gaps = 0, maxgap = 0, lastByteT = t } end
+  elseif off8 == 0x4f and cbl_audio.run then
+    local t = machine.time:as_double()
+    local r = cbl_audio.run
+    if t - r.lastByteT > 0.002 then r.gaps = r.gaps + 1; r.maxgap = math.max(r.maxgap, t - r.lastByteT) end
+    r.lastByteT = t
+    r.bytes = r.bytes + 1
+  end
+end
+local audio_err
 local function on_border(offset, data)         -- MAME drops errors in a tap silently: keep the first one
   local ok, err = pcall(measure_border, offset, data)
   if not ok and not budget.err then budget.err = tostring(err) end
+  local ok2, err2 = pcall(measure_audio, offset, data)
+  if not ok2 and not audio_err then audio_err = tostring(err2) end
+end
+local function report_audio()
+  log("music ticks: %d, %d outside 0.9..1.1 frame", tick_audio.n, #tick_audio.bad)
+  for i = 1, math.min(#tick_audio.bad, 5) do
+    log("  tick: %.2f frames at %.1fs", tick_audio.bad[i].frames, tick_audio.bad[i].t)
+  end
+  log("CBL/SFX runs: %d (%d paced, duration %.2f..%.2f x their blocks), %d too short, %d too long",
+    #cbl_audio.runs, cbl_audio.paced, cbl_audio.min_q or 0, cbl_audio.max_q or 0, #cbl_audio.bad, #cbl_audio.long)
+  for i = 1, math.min(#cbl_audio.bad, 5) do
+    local r = cbl_audio.bad[i]
+    log("  CBL run: %d bytes, %.1f ms (expected >= %.1f ms)", r.bytes, r.dur * 1000, (r.bytes / 128) * CBL_BLOCK_S * 1000 * 0.9)
+  end
+  for i = 1, math.min(#cbl_audio.long, 5) do
+    local r = cbl_audio.long[i]
+    log("  CBL run at %.1fs: %d bytes, %.1f ms (expected <= %.1f ms), longest wait for a block %.1f ms",
+      r.t0, r.bytes, r.dur * 1000, (r.bytes / 128 + 1) * CBL_BLOCK_S * 1000 * 1.1, r.maxgap * 1000)
+  end
+  if audio_err then fail("audio", "music/CBL measurement error: %s", audio_err) end
+  if #tick_audio.bad > 0 then
+    fail("audio", "%d music tick(s) outside 0.9..1.1 frame (a CTC tick dropped or doubled under a long DI)", #tick_audio.bad)
+  end
+  if #cbl_audio.bad > 0 then
+    fail("audio", "%d CBL/SFX run(s) shorter than 90%% of their expected duration (fed on VSync/keyboard too, not just the real half-empty IRQ)", #cbl_audio.bad)
+  end
+  if #cbl_audio.long > 0 then
+    fail("audio", "%d CBL/SFX run(s) longer than their blocks + 1 (a half-empty IRQ missed and not caught up)", #cbl_audio.long)
+  end
 end
 local function report_budget()
   local pct = function(d) return 100 * d / FRAME_S end
@@ -706,8 +796,8 @@ local function scenario()
   shot("title")
 
   -- title: tap Space on the PC/AT (PS/2) keyboard until the render cache (and the debug block
-  -- in it) is installed. The PS/2 path (SIO byte -> IRQ vector #FF -> KeysHandler -> KeyPressed)
-  -- is the only keyboard when MAME has only "kbd:ms_naturl" enabled; the ZX matrix is used in play.
+  -- in it) is installed. The PS/2 path (SIO byte -> KeysHandler -> KeyState/KeyFrame) is the
+  -- only keyboard, on the title and in play alike; the ZX matrix is no longer read.
   local kbd_space = assert(fields["Space"], "no PC keyboard Space field")
   local started = false
   t0 = now()
@@ -890,6 +980,7 @@ local function scenario()
       st.left_clip, st.right_clip, st.max_fall)
   log("autopilot: %d frames inside a tube (immortal bird, hit counter %d)", st.overlap, rec.hits)
   report_budget()
+  report_audio()
   local want = {}
   for s = 50, TARGET_SCORE, 50 do want[#want + 1] = s end
   local got = {}

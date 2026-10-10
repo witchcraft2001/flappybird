@@ -359,9 +359,24 @@ WaitVsync:      di
                 call ChangeVideoPage
                 xor a
                 ld (Im2Handler.needChangePage),a
-.noflip:        ; Poll from the main DRAM code path. Kempston/Sega is #1F here;
+.noflip:        ; Only AF changes here: WaitFrame stands in for a bare halt inside the
+                ; palette fades, whose callers keep HL/D/E live across it.
+                push bc
+                push de
+                call KeysHandler        ; drain the SIO FIFO here too, so a byte stuck
+                                        ; behind a swallowed IM2 ack never survives a frame
+                ld a,(KeyLatch)
+                ld e,a
+                ld a,(KeyState)
+                or e
+                ld (KeyFrame),a         ; frame snapshot: level-held or pressed-since-last-frame
+                xor a
+                ld (KeyLatch),a
+                pop de
+                pop bc
+                ; Poll from the main DRAM code path. Kempston/Sega is #1F here;
                 ; #07 is only for code executed from WIN0/SRAM cache.
-                call PollJoystick
+                call PollJoystick       ; keeps BC/DE/HL
                 ei
                 ret
 
@@ -616,6 +631,7 @@ ClearPauseMessageBack:
                 ld a,c
                 ld (hl),a
                 ld b,b
+                ei
                 pop hl
                 pop bc
                 pop af
@@ -623,7 +639,6 @@ ClearPauseMessageBack:
                 djnz .rowLoop
                 ld a,#c0
                 out (Y_PORT),a
-                ei
                 pop af
                 out (EmmWin.P1),a
                 ret
@@ -767,7 +782,7 @@ WaitTitlePress:
                 ld (KeyPressed),a
 .loop:          call WaitVsync          ; frame-sync; polls joystick after the halt.
                                         ; Keyboard is serviced by the IM2 handler now.
-                call CheckSpace          ; #FE Space + cached joystick fire
+                call CheckSpace          ; PS/2 Space (KeyFrame) + cached joystick fire
                 ret z
                 ld a,(KeyPressed)        ; any PS/2 key (set by the keyboard IRQ)
                 and a
@@ -846,6 +861,7 @@ FillScreen:     in a,(EmmWin.P3)
                 ld a,a
                 ldir
                 ld b,b
+                ei
                 pop af
                 out (EmmWin.P3),a
                 ret
@@ -1195,11 +1211,11 @@ PrintError:
 PlayerInit:
                 in a,(EmmWin.P3)
                 push af
-                ld a,1
-                ld (Im2Handler.musicEnabled),a
                 ld a,(MemoryBuffer.memMusic)
                 out (EmmWin.P3),a
                 call PlayerStart
+                ld a,1                  ; only after the init: a CTC tick inside it would
+                ld (Im2Handler.musicEnabled),a  ; run Player on half-initialised state
 .exit:          pop af
                 out (EmmWin.P3),a
                 ret
@@ -1343,9 +1359,25 @@ SfxPrimePlayback:
                 ld (SfxCblEnabled),a
                 ret
 
+; Vector #FF is shared by VSync (FPGA), every PS/2 byte and this CBL half-FIFO-empty
+; signal, so a plain "feed on every call" (the previous code) fed 128 bytes on VSync
+; and keyboard interrupts too, draining the sample in well under its real duration
+; (observed: hit+die played in ~57% of their real time in MAME). #FE bit 7 (CBL_IND,
+; valid while the CBL is running) is the actual request: only feed when it is set, and
+; check again after feeding in case one half-empty event was already missed while this
+; vector was busy with something else -- catch up by at most one extra block per call
+; (modplay's CBL_ISR, sources/modplay/src/lib/cbl.asm, re-reads bit 7 the same way but
+; only counts the overrun).
+; Writing a block clears the request (MAME: bit 7 = (play ^ write half) & #80), so the
+; second pass only feeds on a real miss. Both passes re-check SfxCblEnabled first: once
+; a pass has finished the sample (SfxFinishCbl, CBL idle) bit 7 is no longer CBL_IND.
 SfxHandleCblInterrupt:
-                ld a,(SfxCblEnabled)
+                call .service           ; first pass, then fall through for the second
+.service:       ld a,(SfxCblEnabled)
                 and a
+                ret z
+                in a,(#FE)
+                and #80
                 ret z
                 ld a,(SfxCurrentId)
                 and a
@@ -1365,6 +1397,8 @@ SfxHandleCblInterrupt:
                 scf
                 ret
 
+; Vector #FF is shared by VSync (FPGA), every PS/2 byte and the CBL half-FIFO-empty
+; signal (see #FE bit 7 in SfxHandleCblInterrupt). Never touches Y_PORT/WIN1/VRAM.
 SfxCblIrqHandler:
                 di
                 push af
@@ -1372,8 +1406,8 @@ SfxCblIrqHandler:
                 push bc
                 push de
                 call SfxHandleCblInterrupt
-                call KeysHandler        ; vector #FF is shared with the PS/2 keyboard IRQ:
-                                        ; read the SIO byte or the keyboard is dead
+                call KeysHandler        ; drain the SIO byte here too, or the keyboard
+                                        ; stalls whenever this vector fires without one
                 pop de
                 pop bc
                 pop hl
@@ -1408,8 +1442,10 @@ SfxFinishCbl:
                 out (c),a
                 ret
 
+; Both callers clear SfxCblEnabled before calling this, so SfxHandleCblInterrupt already
+; ignores the CBL vector for the whole flush -- no di needed, and the caller's IFF is
+; left untouched.
 SfxHardQuenchCbl:
-                di
                 ld bc,CBL_CTRL
                 ld a,CBL_CTRL_RUN_11K_MONO_INT
                 out (c),a
@@ -1469,9 +1505,29 @@ SfxWriteCblBlock:
                 ld e,a
                 jr nc,.spanOk
                 dec d                           ; sample remaining -= n (16-bit)
-.spanOk:        ; B = n (1..128), C = #4F, HL -> sample page (#C000..), DE updated
-.write:         outi
-                jr nz,.write
+.spanOk:        ; B = n (1..128), C = #4F, HL -> sample page (#C000..), DE updated.
+                ; Groups of 8 OUTIs (as in modplay's StreamScratchToFIFO, sources/modplay
+                ; /src/lib/cbl.asm): back-to-back OUTIs are fine on real CBL hardware
+                ; within a group of 8, but a fully unrolled run (128 in a row) measurably
+                ; distorted the sample; pace only between groups, and finish any remainder
+                ; below 8 one byte at a time.
+.write:         ld a,b
+                cp 8
+                jr c,.tail
+                outi
+                outi
+                outi
+                outi
+                outi
+                outi
+                outi
+                outi
+                jr .write
+.tail:          and a
+                jr z,.written
+.tailStep:      outi
+                jr nz,.tailStep
+.written:
                 ld a,(SfxServiceChunkCounter)
                 or a
                 jr nz,.sampleEnded              ; block not full -> sample ran out, chain
@@ -1499,6 +1555,16 @@ SfxWriteCblBlock:
                 out (EmmWin.P3),a
                 ret
 
+; CTC ch3 tick (~50 Hz, synchronized to VSync in set_im2): the frame clock for the main
+; loop and the music. One IM2 ack clears every pending FPGA request (VSync, keyboard,
+; CBL; MAME: irqack_cb -> in_clear<0..2>), so this handler also drains the SIO FIFO and
+; serves a CBL half-empty request whose own #FF interrupt this CTC ack swallowed;
+; otherwise that block is lost and the sample stalls for one block. The CBL check comes
+; after Player: #FE bit 7 stays set until the block is written, so it still sees a
+; request swallowed by the ack, and also one raised while Player ran (in MAME the CTC's
+; RETI drops the shared INT line under such a request, so it would never be taken).
+; Writes only EmmWin.P3 (saved/restored) for the player; never touches Y_PORT, WIN1 or
+; VRAM, so it needs no coordination with the accelerator di/ei windows in the renderer.
 Im2Handler:     di
                 push af
                 push hl
@@ -1514,6 +1580,7 @@ Im2Handler:     di
                 push de
                 push ix
                 push iy
+                call KeysHandler
 		ld a,0
 .needChangePage: equ $-1
 		and a
@@ -1526,6 +1593,7 @@ Im2Handler:     di
 .musicEnabled:  equ $-1
                 and a
                 call nz,Player
+                call SfxHandleCblInterrupt      ; after Player: see above
                 pop af
                 out (EmmWin.P3),a
                 ld a,1

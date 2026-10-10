@@ -231,6 +231,15 @@ SetPalette:
 	ei
 	RET
 
+;HL - palette (4 bytes per entry: B, G, R, Y)
+;D - Colors count (0 = 256)
+;E - Start color number
+; Writes both palette copies through VRAM page #50 in WIN3. A full table is 200..256
+; entries, about 4 ms, so under IM2 DI covers one entry at a time, like the accelerator
+; rows: our handlers restore WIN3 themselves and never write Y_PORT, so an interrupt
+; between two entries is harmless. Before set_im2 the whole table stays under DI: the DSS
+; IM1 handler (mouse M_INT, DOS-MAIN.ASM/INTMOUSE.ASM) saves Y_PORT by reading #89 back
+; and rewrites it every interrupt.
 SetPaletteBoth:
 	di
 	push	af
@@ -245,6 +254,7 @@ SetPaletteBoth:
 	out	(Y_PORT),a
 	ld	b,d
 .loop:
+	di
 	ld	a,(hl)		; B
 	ld	(#C3E2),a
 	ld	(#C3E6),a
@@ -264,7 +274,12 @@ SetPaletteBoth:
 	inc	e
 	ld	a,e
 	out	(Y_PORT),a
-	djnz	.loop
+	ld	a,(Im2Active)
+	and	a
+	jr	z,.next
+	ei			; taken after djnz, before the di at .loop
+.next:	djnz	.loop
+	di
 	ld	a,#C0
 	out	(Y_PORT),a
 	ld	a,0
@@ -421,13 +436,13 @@ UnfadePallete:
 	ld a,(UnfadeStartColor)
 	ld e,a
 	call SetPaletteBoth
-	halt
+	call WaitFrame
 	ld a,1
 .unfadeloop:
 	push af
 	call BuildFadeLut
 	call BuildUnfadePalette
-	halt
+	call WaitFrame
 	ld hl,(UnfadeBufferPtr)
 	ld a,(UnfadeColorCount)
 	ld d,a
@@ -543,11 +558,26 @@ FadePallete:
 	inc hl
 	djnz .loop1
 	pop hl
-	halt
+	call WaitFrame
 	call SetPaletteBoth
 	pop af
 	dec a
 	jr nz,.fadeloop
+	ret
+
+; One frame tick for a fade step. Once set_im2 has started the CTC frame timer
+; (Im2Active), wait for the real frame boundary the same way the main loop does:
+; a bare halt wakes on ANY interrupt (a PS/2 byte, the shared CBL/VSync vector),
+; so a keyboard byte would otherwise shorten this step and desync the fade.
+; Before set_im2 (the boot logo, still under the DSS IM1 50 Hz interrupt) a plain
+; halt is the only frame tick available.
+; Like the halt it replaces, keeps BC/DE/HL (FadePallete holds the buffer in HL and the
+; colour count/start in D/E across it); only AF changes.
+WaitFrame:
+	ld a,(Im2Active)
+	and a
+	jp nz,WaitVsync
+	halt
 	ret
 
 ADDR:	EQU	#C000

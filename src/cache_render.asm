@@ -389,16 +389,11 @@ CacheCheckCollisions:
                 jp CacheSetGameOver
 
 CacheCheckSpace:
-                ld a,127
-                in a,(#FE)
+                ld a,(KeyFrame)         ; PS/2 Space (bit0), sampled once per frame in WaitVsync
                 bit 0,a
-                jr nz,.tryJoy
-                ld a,#FE
-                in a,(#FE)
-                bit 0,a
-                jr z,.tryJoy            ; Caps+Space = Esc combo, not a flap
+                jr z,.tryJoy
                 xor a
-                ret                     ; Space (no Caps) -> flap (z)
+                ret                     ; Space -> flap (z)
 .tryJoy:        call CacheCheckJoystickFire
                 jr z,.flap
                 ld a,1
@@ -538,18 +533,19 @@ CacheDrawBird:
                 ld (.y),a
                 ex de,hl
                 pop hl
-                di
 .loop:          ld a,0
 .y:             equ $-1
                 out (Y_PORT),a
                 inc a
                 ld (.y),a
+                di
                 ld d,d
                 ld a,17
                 ld l,l
                 ld a,(hl)
                 ld (de),a
                 ld b,b
+                ei
                 ld a,l
                 add a,17
                 ld l,a
@@ -560,7 +556,6 @@ CacheDrawBird:
                 out (EmmWin.P3),a
                 pop af
                 out (EmmWin.P1),a
-                ei
                 ret
 
 CacheDrawCity:
@@ -617,7 +612,7 @@ CacheDrawCity:
                 ld a,(hl)
                 ld (de),a
                 ld b,b
-                ; keep IRQs disabled while WIN1 is mapped to VRAM
+                ei
                 ld bc,276
                 add hl,bc
                 pop af
@@ -628,7 +623,6 @@ CacheDrawCity:
                 out (EmmWin.P3),a
                 pop af
                 out (EmmWin.P1),a
-                ei
                 ret
 
 CacheUpdateWayPos:
@@ -694,7 +688,7 @@ CacheDrawWay:
                 ld a,(hl)
                 ld (de),a
                 ld b,b
-                ; keep IRQs disabled while WIN1 is mapped to VRAM
+                ei
                 ld bc,140
                 add hl,bc
                 pop af
@@ -705,7 +699,6 @@ CacheDrawWay:
                 out (EmmWin.P3),a
                 pop af
                 out (EmmWin.P1),a
-                ei
                 ret
 
 CacheDrawTubes:
@@ -1372,10 +1365,12 @@ CacheRestoreTube:
                 ld d,d
                 ld a,220
                 ld b,b
+                ei
                 xor a
                 push hl
                 pop de
-.loop:          out (Y_PORT),a
+.loop:          di
+                out (Y_PORT),a
                 ld a,a
                 ld c,(hl)
                 ld b,b
@@ -1383,6 +1378,7 @@ CacheRestoreTube:
                 ld a,a
                 ld (hl),c
                 ld b,b
+                ei
                 inc hl
                 djnz .loop
 .exit:          pop af
@@ -1606,14 +1602,17 @@ CacheDrawTubeBody:
                 ld b,0
 .hgt:           equ $-1
                 ld b,b
+                ei
                 ex af,af'
                 ld b,a
 .loop:          ld a,b
                 out (Y_PORT),a
+                di
                 ld a,(hl)
                 ld e,e
                 ld (de),a
                 ld b,b
+                ei
                 inc hl
                 inc de
                 dec c
@@ -1622,18 +1621,19 @@ CacheDrawTubeBody:
 
 CacheDrawTubeHead:
                 ex af,af'
-                di
                 DUP 13
                 ex af,af'
                 out (Y_PORT),a
                 inc a
                 ex af,af'
+                di
                 ld d,d
                 ld a,(CacheDrawTubeHead.len)
                 ld l,l
                 ld a,(hl)
                 ld (de),a
                 ld b,b
+                ei
                 ld bc,TubeWidth
                 add hl,bc
                 EDUP
@@ -1758,6 +1758,7 @@ CacheClearScoreRect:
                 ld a,2
                 ld (hl),a
                 ld b,b
+                ei
                 djnz .rowLoop
                 ld a,#c0
                 out (Y_PORT),a
@@ -1783,6 +1784,7 @@ CacheClearHighScoreRect:
                 ld a,2
                 ld (hl),a
                 ld b,b
+                ei
                 djnz .rowLoop
                 ld a,#c0
                 out (Y_PORT),a
@@ -1861,6 +1863,7 @@ CacheDrawFieldMedal:
                 ld a,(hl)
                 ld (de),a
                 ld b,b
+                ei
                 pop hl
                 ld bc,24
                 add hl,bc
@@ -2098,6 +2101,7 @@ CacheDrawBigDigitSprite:
                 ld a,(hl)
                 ld (de),a
                 ld b,b
+                ei
                 pop hl
                 ld bc,16
                 add hl,bc
@@ -2146,6 +2150,7 @@ CacheDrawTitle:
                 ld a,(hl)
                 ld (de),a
                 ld b,b
+                ei
                 pop de
                 ld bc,96
                 add hl,bc
@@ -2188,6 +2193,7 @@ CacheDrawFlappyBirdFooter:
                 ld a,(hl)
                 ld (de),a
                 ld b,b
+                ei
                 pop de
                 ld bc,96
                 add hl,bc
@@ -2238,6 +2244,7 @@ CacheDrawGameOverPanelFrame:
                 ld a,(hl)
                 ld (de),a
                 ld b,b
+                ei
                 pop de
                 ld bc,113
                 add hl,bc
@@ -2293,6 +2300,7 @@ CacheDrawGameOverMedal:
                 ld a,(hl)
                 ld (de),a
                 ld b,b
+                ei
                 pop hl
                 ld bc,24
                 add hl,bc
@@ -2498,6 +2506,7 @@ CacheClearSkyRect:
                 ld a,c
                 ld (hl),a
                 ld b,b
+                ei
                 pop hl
                 pop de
                 pop bc
@@ -2545,6 +2554,7 @@ CacheRestoreOverlayRect:
                 ld c,(hl)
                 ld (hl),c
                 ld b,b
+                ei
                 pop hl
                 pop bc
                 pop af
@@ -2613,6 +2623,7 @@ CacheClearPlayfieldPages:
                 ld a,c
                 ld (hl),a
                 ld b,b
+                ei
                 pop hl
                 pop bc
                 pop de
@@ -2634,9 +2645,9 @@ CacheRestoreRect:
                 add hl,de
 .firstpg:       ld a,c
                 ld (.hgt),a
-                di
                 ex af,af'
-.loop:          out (Y_PORT),a
+.loop:          di
+                out (Y_PORT),a
                 inc a
                 ld d,d
                 ld c,0
@@ -2645,6 +2656,7 @@ CacheRestoreRect:
                 ld c,(hl)
                 ld (hl),c
                 ld b,b
+                ei
                 djnz .loop
                 pop af
                 out (EmmWin.P3),a
