@@ -108,6 +108,7 @@ CacheRestoreBirdBackground:
 CacheUpdateBirdCoord:
                 call CacheCheckSpace
                 jr nz,.down
+                call CacheFlapSound
                 xor a
                 ld (.state),a
                 ld a,6
@@ -148,6 +149,23 @@ CacheUpdateBirdCoord:
                 xor a
                 ld (.state),a
                 jp CacheSetGameOver
+
+; The bird climbs on every frame Space or Fire is held, but the wing sound goes once per
+; press: on the PS/2 press edge (KeyFrameEdge, which typematic repeats of a held key do
+; not set) or the joystick's JoyFire edge (both formed once per frame in WaitVsync).
+CacheFlapSound:
+                ld a,(KeyFrameEdge)
+                and 1                   ; Space
+                ld b,a
+                ld a,(JoyFire)
+                or b
+                ret z
+                IFDEF AUTOTEST
+                ld hl,(DbgWingReq)
+                inc hl
+                ld (DbgWingReq),hl
+                ENDIF
+                jp SfxQueueWing
 
 CacheGameOverFall:
                 ld a,(BirdY)
@@ -2744,6 +2762,7 @@ CacheDbgRecord:
 DbgMagic:       db "FBAT"
 DbgHits:        dw 0
 DbgMortal:      db 0                    ; set by the test script to let the bird die
+DbgWingReq:     dw 0                    ; wing sounds asked for (CacheFlapSound), one per press
 DbgLive:        ds DBG_REC_SIZE,0
 DbgPage0:       ds DBG_REC_SIZE,0
 DbgPage1:       ds DBG_REC_SIZE,0

@@ -109,9 +109,11 @@ PollJoystick:
 ; PS/2 scan-code decoder (as in zx-sprinter-sdk sdk/src/sprinter/lib_input.asm, PS2Scan/
 ; KeyHandler): tracks Space/Esc as live level state (KeyState) plus a one-frame "was
 ; pressed" latch (KeyLatch), so a tap shorter than a frame still registers for the frame
-; it falls in. Called from every IM2 path (Im2Handler, SfxCblIrqHandler, Im2OtherHandler,
-; set_im2.sync) and once more from WaitVsync, so a byte is never left in the SIO FIFO
-; across a frame. WaitVsync folds KeyState|KeyLatch into KeyFrame once per frame;
+; it falls in, and a press edge (KeyEdge) that the PS/2 typematic repeat of a held key
+; does not set again, for things done once per press (the wing sound). Called from every
+; IM2 path (Im2Handler, SfxCblIrqHandler, Im2OtherHandler, set_im2.sync) and once more
+; from WaitVsync, so a byte is never left in the SIO FIFO across a frame. WaitVsync folds
+; KeyState|KeyLatch into KeyFrame and KeyEdge into KeyFrameEdge once per frame;
 ; CheckControlKey/CacheCheckSpace read KeyFrame, not the #FE ZX matrix (deprecated in
 ; Sprinter mode). KeyPressed keeps its old meaning: the last make code, used by the
 ; title screen as "any PS/2 key". As in the SDK, an #E0-prefixed key is its own code
@@ -149,6 +151,13 @@ KeysHandler:
 .known:         bit 6,d
                 jr nz,.release
                 ld (KeyPressed),a       ; any key -> "press any key" on the title
+                ld a,(KeyState)
+                cpl
+                and b                   ; not held yet: a real press, not a typematic
+                ld e,a                  ; repeat of a held key
+                ld a,(KeyEdge)
+                or e
+                ld (KeyEdge),a
                 ld a,(KeyLatch)
                 or b
                 ld (KeyLatch),a
@@ -175,6 +184,8 @@ KeysHandler:
 KeyState:	db	0		; bit0 Space held, bit1 Esc held (live PS/2 level)
 KeyLatch:	db	0		; bit0/1 set on make, OR'd into KeyFrame once per frame
 KeyFrame:	db	0		; snapshot formed in WaitVsync: KeyState | KeyLatch
+KeyEdge:	db	0		; bit0/1 set on a press (make after a break), not on repeats
+KeyFrameEdge:	db	0		; snapshot formed in WaitVsync: presses since the last frame
 KeyPressed:	db	0		; last make code (#80|code if extended), 0 = none
 ; процедура сохранения страницы в указнном окне.
 ; C = окно (порт)

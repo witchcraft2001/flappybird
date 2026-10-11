@@ -645,6 +645,25 @@ local function measure_audio(offset, data)
     r.bytes = r.bytes + 1
   end
 end
+-- The PS/2 bytes the game reads from the SIO (#18), decoded here independently of KeysHandler:
+-- a Space make (#29) after its break is one press, a typematic repeat while held is not.
+local kbd_rx = { ext = false, brk = false, held = false, presses = 0, makes = 0 }
+local function on_sio_read(offset, data)
+  if offset & 0xff ~= 0x18 then return end
+  local k = kbd_rx
+  if data == 0xE0 then k.ext = true
+  elseif data == 0xF0 then k.brk = true
+  else
+    if data == 0x29 and not k.ext then
+      if k.brk then k.held = false
+      else
+        k.makes = k.makes + 1
+        if not k.held then k.held, k.presses = true, k.presses + 1 end
+      end
+    end
+    k.ext, k.brk = false, false
+  end
+end
 local audio_err
 local function on_border(offset, data)         -- MAME drops errors in a tap silently: keep the first one
   local ok, err = pcall(measure_border, offset, data)
@@ -652,7 +671,28 @@ local function on_border(offset, data)         -- MAME drops errors in a tap sil
   local ok2, err2 = pcall(measure_audio, offset, data)
   if not ok2 and not audio_err then audio_err = tostring(err2) end
 end
+-- One CBL voice: hit+die over everything, the medal's point over a flap, a flap over silence only
+-- (SfxQueueHitDie / SfxQueueOverWing). Every medal starts its point sound and nothing cuts it,
+-- the one death plays hit then die to the end; flaps are dropped under them, a flap restarts a flap.
+local SFX_ID = { hit = S("SFX_ID_HIT"), die = S("SFX_ID_DIE"), point = S("SFX_ID_POINT"), wing = S("SFX_ID_WING") }
+local function report_sfx()
+  local x = st.sfx
+  if not x then fail("sfx", "no SFX counters read (the game did not get to the exit)"); return end
+  local medals = 0
+  for id in pairs(st.medal_seen) do if MEDAL_SCORE[id] then medals = medals + 1 end end   -- not #ff: no medal yet
+  log("SFX started/played to the end/dropped: hit %d/%d/%d, die %d/%d/%d, point %d/%d/%d (%d medals), wing %d/%d/%d",
+    x.hit.starts, x.hit.ends, x.hit.drops, x.die.starts, x.die.ends, x.die.drops,
+    x.point.starts, x.point.ends, x.point.drops, medals, x.wing.starts, x.wing.ends, x.wing.drops)
+  if x.point.starts ~= medals then fail("sfx", "%d point sounds started for %d medals", x.point.starts, medals) end
+  if x.point.ends ~= x.point.starts then fail("sfx", "%d of %d point sounds cut before their end", x.point.starts - x.point.ends, x.point.starts) end
+  for _, n in ipairs({ "hit", "die" }) do
+    if x[n].starts ~= 1 or x[n].ends ~= 1 then fail("sfx", "%s sound started %d, played to the end %d times for one death", n, x[n].starts, x[n].ends) end
+  end
+  if x.wing.starts == 0 then fail("sfx", "no wing sound started") end
+end
+
 local function report_audio()
+  report_sfx()
   log("music ticks: %d, %d outside 0.9..1.1 frame", tick_audio.n, #tick_audio.bad)
   for i = 1, math.min(#tick_audio.bad, 5) do
     log("  tick: %.2f frames at %.1fs", tick_audio.bad[i].frames, tick_audio.bad[i].t)
@@ -812,6 +852,10 @@ local function scenario()
   if not started then fail("start", "the game did not start in %d s after Fire on the title", 30); shot("no-start"); return end
   log("game started %.1f s after Fire on the title (cache at +%X)", now() - t0, fast_off)
   st.border_tap = cpu.spaces["io"]:install_write_tap(0x0000, 0xffff, "fbird-border", on_border)   -- kept: a dropped tap is removed
+  st.sio_tap = cpu.spaces["io"]:install_read_tap(0x0000, 0xffff, "fbird-sio", function(offset, data)
+    local ok, err = pcall(on_sio_read, offset, data)
+    if not ok and not audio_err then audio_err = tostring(err) end
+  end)
 
   -- Get Ready countdown, paused in the middle (digit 2 on both pages): the countdown stops with
   -- the message shown, and after Fire both pages are redrawn with the banner and it goes on.
@@ -846,6 +890,7 @@ local function scenario()
 
   -- play to the target score
   t0 = now()
+  local wing0, press0 = fu16(S("DbgWingReq")), kbd_rx.presses
   local last_score, t_score = -1, now()
   while rec.score < TARGET_SCORE do
     frames(1)
@@ -858,6 +903,26 @@ local function scenario()
   end
   space(false)
   log("played to score %d: %d frames in %.1f s", rec.score, st.shown, now() - t0)
+  for _ = 1, 5 do frames(1); rec = tick(false) end
+  log("autopilot: %d Space presses, %d wing sounds asked for (presses during a theme fade fly nothing)",
+      kbd_rx.presses - press0, fu16(S("DbgWingReq")) - wing0)
+
+  -- Wing sound: one per press, not one per frame of the climb. Presses of 1..5 frames and a hold
+  -- long enough for the PS/2 typematic repeat, each followed by a release: the game must ask for
+  -- the sound (CacheFlapSound -> DbgWingReq) exactly once per press seen in the PS/2 stream.
+  local holds = { 1, 2, 5, 1, 3, 40, 1, 2 }
+  wing0, press0 = fu16(S("DbgWingReq")), kbd_rx.presses
+  local makes0 = kbd_rx.makes
+  for _, h in ipairs(holds) do
+    space(true); for _ = 1, h do frames(1); rec = tick(false) end
+    space(false); for _ = 1, 6 do frames(1); rec = tick(false) end
+  end
+  local wings, presses, makes = fu16(S("DbgWingReq")) - wing0, kbd_rx.presses - press0, kbd_rx.makes - makes0
+  log("wing sound: %d presses by the test, %d in the PS/2 stream (%d Space makes with typematic repeats), %d wing sounds asked for",
+      #holds, presses, makes, wings)
+  if rec.mode ~= MODE.PLAY then fail("wing", "the game left play during the wing presses (mode %d)", rec.mode)
+  elseif presses ~= #holds then fail("wing", "%d Space presses in the PS/2 stream for %d pressed by the test", presses, #holds)
+  elseif wings ~= presses then fail("wing", "%d wing sounds asked for %d Space presses, expected one per press", wings, presses) end
 
   -- Pause and continue in the current theme, with a tube under the message. The frame under the
   -- message stays intact; after continue every pixel of it is either still as it was while paused
@@ -964,6 +1029,14 @@ local function scenario()
     if rec.mode ~= MODE.PLAY or st.compared - first < 250 then fail("restart", "the restarted game does not play (mode %d)", rec.mode) end
     if rec.theme ~= 0 or rec.score > 5 then fail("restart", "restarted with theme %d, score %d", rec.theme, rec.score) end
     log("death in theme %d and restart: theme %d, score %d, %d frames compared", died_theme, rec.theme, rec.score, st.compared - first)
+  end
+
+  -- the SFX counters live in the resident part of the game, gone once it has returned to DSS
+  local prog = cpu.spaces["program"]
+  st.sfx = {}
+  for name, id in pairs(SFX_ID) do
+    local function u16(tab) local a = S(tab) + 2 * id; return prog:read_u8(a) + 256 * prog:read_u8(a + 1) end
+    st.sfx[name] = { starts = u16("SfxDbgStarts"), ends = u16("SfxDbgEnds"), drops = u16("SfxDbgDrops") }
   end
 
   -- Esc, Esc: back to DSS

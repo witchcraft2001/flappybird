@@ -91,7 +91,7 @@ main:	        di
                 call LoadResourceList
                 jp c,.error
                 ld de,MemoryBuffer.memSfxHit
-                ld b,3
+                ld b,4                  ; hit, die, point, wing
                 call LoadResourceList
                 jp c,.error
                 ld de,MemoryBuffer.memCityNight
@@ -370,8 +370,11 @@ WaitVsync:      di
                 ld a,(KeyState)
                 or e
                 ld (KeyFrame),a         ; frame snapshot: level-held or pressed-since-last-frame
+                ld a,(KeyEdge)
+                ld (KeyFrameEdge),a     ; presses since the last frame (no typematic repeats)
                 xor a
                 ld (KeyLatch),a
+                ld (KeyEdge),a
                 pop de
                 pop bc
                 ; Poll from the main DRAM code path. Kempston/Sega is #1F here;
@@ -1238,6 +1241,7 @@ SFX_ID_NONE     equ 0
 SFX_ID_HIT      equ 1
 SFX_ID_DIE      equ 2
 SFX_ID_POINT    equ 3
+SFX_ID_WING     equ 4
 SFX_SILENCE_TAIL_BLOCKS equ 3
 
 SfxInit:
@@ -1278,6 +1282,9 @@ SfxFlushCblBuffer:
                 out (c),a
                 ret
 
+; Priorities (one CBL voice, no mixing): hit+die over everything, the medal's point over a
+; flap, a flap over silence only. A sound that loses is dropped, not queued; a flap
+; restarts a flap still playing, one sound per press.
 SfxQueueHitDie:
                 ld a,(SfxCurrentId)
                 cp SFX_ID_HIT
@@ -1295,19 +1302,50 @@ SfxQueueHitDie:
                 jp SfxPrimePlayback
 
 SfxQueuePoint:
-                ld a,(SfxCurrentId)
-                and a
-                ret nz
+                ld a,SFX_ID_POINT
+                jr SfxQueueOverWing
+
+SfxQueueWing:
+                ld a,SFX_ID_WING
+; A = a sound that may replace silence or a flap, nothing else: not hit/die (nor the die
+; queued behind hit), not a point already playing.
+SfxQueueOverWing:
+                ld c,a
                 ld a,(SfxQueue0)
                 and a
-                ret nz
+                jr nz,.drop
+                ld a,(SfxCurrentId)
+                and a
+                jr z,.play
+                cp SFX_ID_WING
+                jr z,.play
+.drop:
+                IFDEF AUTOTEST
+                ld a,c
+                ld hl,SfxDbgDrops
+                call SfxDbgInc
+                ENDIF
+                ret
+.play:          ld a,c
+                ; fall through
+
+; Starts sound A at once over whatever plays (the caller has decided it may), without
+; flushing the FIFO: at most the two blocks already in it play out first (~33 ms), where
+; SfxAbortCblPlayback's flush of 512 bytes would cost ~2.4 ms of CPU in the very frame
+; that asks for the sound -- for a flap, any frame of play.
+SfxPlayNow:
+                di
+                ld (SfxQueue0),a
+                xor a
+                ld (SfxQueue1),a
+                ld (SfxCurrentId),a
+                ld (SfxSilenceBlocks),a
+                call SfxStartNext
                 ld a,(SfxCblEnabled)
                 and a
-                call nz,SfxAbortCblPlayback
-                ld a,SFX_ID_POINT
-                ld (SfxQueue0),a
-                call SfxStartNext
-                jp SfxPrimePlayback
+                call z,SfxPrimePlayback ; idle: start the CBL; running: the next block is ours
+                ei
+                ret
 
 SfxStartNext:
                 ld a,(SfxCurrentId)
@@ -1317,6 +1355,12 @@ SfxStartNext:
                 and a
                 ret z
                 ld (SfxCurrentId),a
+                IFDEF AUTOTEST
+                push af
+                ld hl,SfxDbgStarts
+                call SfxDbgInc
+                pop af
+                ENDIF
                 push af
                 ld a,(SfxQueue1)
                 ld (SfxQueue0),a
@@ -1329,6 +1373,8 @@ SfxStartNext:
                 jr z,.die
                 cp SFX_ID_POINT
                 jr z,.point
+                cp SFX_ID_WING
+                jr z,.wing
                 xor a
                 ld (SfxCurrentId),a
                 ret
@@ -1340,6 +1386,9 @@ SfxStartNext:
                 jr .store
 .point:         ld a,(MemoryBuffer.memSfxPoint)
                 ld de,SFX_POINT_LEN
+                jr .store
+.wing:          ld a,(MemoryBuffer.memSfxWing)
+                ld de,SFX_WING_LEN
 .store:         ld (SfxCurrentPage),a
                 ld hl,#C000
                 ld (SfxCurrentPtr),hl
@@ -1536,7 +1585,13 @@ SfxWriteCblBlock:
                 pop af
                 out (EmmWin.P3),a
                 ret
-.sampleEnded:   xor a
+.sampleEnded:
+                IFDEF AUTOTEST
+                ld a,(SfxCurrentId)
+                ld hl,SfxDbgEnds
+                call SfxDbgInc
+                ENDIF
+                xor a
                 ld (SfxCurrentId),a
                 call SfxStartNext
                 ld a,(SfxCurrentId)
@@ -1675,6 +1730,22 @@ PRESS_TO_START_LEN equ $-PressToStartText
                 db 0
                 IFDEF AUTOTEST
 DbgTitleReady:  db 0                    ; set when the title waits for Fire (tools/mame_fbird.lua)
+; Per SFX id (dw each, index = id): started (SfxStartNext), played to the last byte
+; (SfxWriteCblBlock), dropped for a sound of higher priority (SfxQueueOverWing).
+SfxDbgStarts:   ds 2*(SFX_ID_WING+1),0
+SfxDbgEnds:     ds 2*(SFX_ID_WING+1),0
+SfxDbgDrops:    ds 2*(SFX_ID_WING+1),0
+; HL = one of the tables above, A = SFX id: counts one. Trashes AF, HL.
+SfxDbgInc:      add a,a
+                add a,l
+                ld l,a
+                jr nc,.inc
+                inc h
+.inc:           inc (hl)
+                ret nz
+                inc hl
+                inc (hl)
+                ret
                 ENDIF
 PauseContinueText:
                 db "PRESS FIRE TO CONTINUE"
@@ -1705,9 +1776,10 @@ MemoryBuffer:
 .memSfxHit      db 0
 .memSfxDie      db 0
 .memSfxPoint    db 0
+.memSfxWing     db 0
 .memCityNight   db 0
                 db 0
-assetsBlocks    db 18
+assetsBlocks    db 19
 MemoryDescriptor:
                 db 0
 
@@ -2026,4 +2098,5 @@ PlayerEnd:
                 RESOURCE ResEnd13, "assets/hit.raw"
                 RESOURCE ResEnd14, "assets/die.raw"
                 RESOURCE ResEnd15, "assets/point.raw"
-                RESOURCE ResEnd16, "assets/cityn.bin"
+                RESOURCE ResEnd16, "assets/wing.raw"
+                RESOURCE ResEnd17, "assets/cityn.bin"
