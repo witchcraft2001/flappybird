@@ -169,11 +169,15 @@ main:	        di
                 jp nz,.exit
                 jp .loop
 .render:
+                IFDEF AUTOTEST
                 ld a,2
                 out (#fe),a
+                ENDIF
                 call RunRenderCache
+                IFDEF AUTOTEST
                 xor a
                 out (#fe),a
+                ENDIF
                 ld a,(RestartTransitionRequest)
                 and a
                 call nz,RestartGameWithFade
@@ -1680,7 +1684,7 @@ FileReadErrorMessage:
 		db cr,lf,0
 
 BannerMessage:
-                db "FlappyBird by Dmitry Mikhalchenkov v.0.2.1",cr,lf,0
+                db "FlappyBird by Dmitry Mikhalchenkov v.0.2.2",cr,lf,0
 
 ResourcesLoadingMessage:
                 db cr,lf,"Loading resources, please wait ...",cr,lf
